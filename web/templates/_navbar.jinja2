@@ -1,0 +1,66 @@
+{% import '_licenses_modal.jinja2' as licenses_modal with context %}
+{% macro render() %}
+<nav class="navbar navbar-expand py-1">
+    <div class="container-fluid">
+
+        <span class="navbar-brand">
+            <img src="/static/img/icon.webp" width="30" class="d-inline-block align-text-top">
+            <a class="link-dark link-underline-opacity-0" href="/">Relatify</a>
+            <span class="navbar-brand-sub">
+                by
+                <a class="link-dark link-offset-1 link-underline-opacity-25 link-underline-opacity-75-hover"
+                    href="https://monicz.dev" target="_blank">
+                    Kamil Monicz</a>
+            </span>
+        </span>
+
+        <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="modal" data-bs-target="#licenses-modal">Licenses</button>
+            </li>
+            <li class="nav-item">
+                <span class="nav-link px-0">・</span>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="mailto:kamil@monicz.pl">Contact</a>
+            </li>
+            <li class="nav-item">
+                <span class="nav-link px-0">・</span>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="https://github.com/Zaczero/osm-relatify/issues" target="_blank">
+                    Bug report
+                </a>
+            </li>
+            <li class="nav-item">
+                <span class="nav-link px-0">・</span>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="https://github.com/Zaczero/osm-relatify" target="_blank">
+                    <img class="repo-stars" alt="GitHub Repo stars"
+                        src="https://img.shields.io/github/stars/Zaczero/osm-relatify?style=social">
+                </a>
+            </li>
+        </ul>
+
+        <ul class="navbar-nav">
+            <li class="nav-item d-flex align-items-center">
+                {% if user.img.href %}
+                <img class="me-1 rounded" src="{{ user.img.href }}" width="28" height="28" alt="Profile picture">
+                {% endif %}
+
+                <a class="me-2 link-dark link-offset-1 link-underline-opacity-0 link-underline-opacity-50-hover"
+                    href="https://www.openstreetmap.org/user/{{ user.display_name | urlencode }}" target="_blank">
+                    {{ user.display_name }}
+                </a>
+
+                <form class="d-inline" action="/logout" method="post">
+                    <input class="btn btn-sm btn-light" type="submit" value="⏻ Logout">
+                </form>
+            </li>
+        </ul>
+
+    </div>
+</nav>
+{{ licenses_modal.render() }}
+{% endmacro %}

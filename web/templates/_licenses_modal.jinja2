@@ -1,0 +1,91 @@
+{% macro render() %}
+<div class="modal fade" id="licenses-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title">Open Source Licenses — Thank You!</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+
+                <p>Below is a list of open source projects used in this application:</p>
+
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th scope="col">Project Name</th>
+                            <th scope="col">License</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr>
+                            <td>
+                                <pre><a href="https://github.com/Zaczero/osm-relatify" target="_blank">osm-relatify</a></pre>
+                            </td>
+                            <td>
+                                <pre><a href="https://github.com/Zaczero/osm-relatify/blob/main/LICENSE" target="_blank">AGPL-3.0</a></pre>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td>
+                                <pre><a href="https://getbootstrap.com/" target="_blank">Bootstrap</a></pre>
+                            </td>
+                            <td>
+                                <pre><a href="https://github.com/twbs/bootstrap/blob/main/LICENSE" target="_blank">MIT</a></pre>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td>
+                                <pre><a href="https://leafletjs.com/" target="_blank">Leaflet</a></pre>
+                            </td>
+                            <td>
+                                <pre><a href="https://github.com/Leaflet/Leaflet/blob/main/LICENSE" target="_blank">BSD 2-Clause</a></pre>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <pre><a href="https://rubenspgcavalcante.github.io/leaflet-ant-path/" target="_blank">Leaflet Ant Path</a></pre>
+                            </td>
+                            <td>
+                                <pre><a href="https://github.com/rubenspgcavalcante/leaflet-ant-path/blob/master/LICENSE" target="_blank">MIT</a></pre>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <pre><a href="https://github.com/slutske22/leaflet-arrowheads" target="_blank">Leaflet Arrowheads</a></pre>
+                            </td>
+                            <td>
+                                <pre><a href="https://github.com/slutske22/leaflet-arrowheads/blob/master/LICENSE" target="_blank">MIT</a></pre>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <pre><a href="https://github.com/makinacorpus/Leaflet.GeometryUtil" target="_blank">Leaflet GeometryUtil</a></pre>
+                            </td>
+                            <td>
+                                <pre><a href="https://github.com/makinacorpus/Leaflet.GeometryUtil/blob/master/LICENSE" target="_blank">BSD 3-Clause</a></pre>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <pre><a href="https://github.com/mourner/rbush" target="_blank">RBush</a></pre>
+                            </td>
+                            <td>
+                                <pre><a href="https://github.com/mourner/rbush/blob/master/LICENSE" target="_blank">MIT</a></pre>
+                            </td>
+                        </tr>
+
+                    </tbody>
+                </table>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endmacro %}

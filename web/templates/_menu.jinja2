@@ -1,0 +1,64 @@
+{% macro render() %}
+
+<div id="menu">
+
+    <div class="view" id="view-load">
+        <h5 class="title">
+            Enter a <b>bus route</b> relation ID
+        </h5>
+        <form class="body" id="load-relation-form">
+            <input type="number" class="form-control mb-2" name="relation-id"
+                value="{{ request.query_params.get('relation', '') }}" required>
+            <button type="submit" class="btn btn-load btn-primary w-100">
+                Load
+            </button>
+        </form>
+    </div>
+
+    <div class="view d-none" id="view-edit">
+        <h5 class="title">
+            Editing relation
+            <b>#<span class="relation-id"></span></b>
+            <a class="relation-url" target="_blank">🔗</a>
+        </h5>
+        <div class="body">
+            <button class="btn btn-link btn-back p-0 mb-2">« Change bus route</button>
+            <table class="table table-sm table-bordered table-tags mb-2">
+                <tbody id="edit-tags"></tbody>
+            </table>
+
+            <div id="edit-warnings"></div>
+
+            <div class="actions text-end">
+                <button class="btn btn-primary btn-next w-100 d-none">Finish editing</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="view d-none" id="view-submit">
+        <h5 class="title">
+            Route summary
+            <a class="relation-url" target="_blank">🔗</a>
+        </h5>
+        <div class="body">
+            <button class="btn btn-link btn-back p-0 mb-2">« Go back</button>
+
+            <div id="route-summary"></div>
+
+            <div class="actions">
+                <div class="mb-1">
+                    <button class="btn btn-primary btn-upload w-100">
+                        <img src="/static/img/openstreetmap.svg" class="icon" alt="OpenStreetMap logo" height="22">
+                        Upload to OSM
+                    </button>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-secondary btn-download w-100">💾 Download .osc</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endmacro %}

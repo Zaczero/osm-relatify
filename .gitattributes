@@ -1,0 +1,5 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# https://stackoverflow.com/a/26948938
+web/static/** linguist-vendored

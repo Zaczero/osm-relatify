@@ -1,0 +1,21 @@
+{% extends '_base.jinja2' %}
+{% import '_navbar.jinja2' as navbar with context %}
+{% import '_menu.jinja2' as menu with context %}
+{% block body %}
+
+<div class="container-full-screen">
+  {{ navbar.render() }}
+
+  <div class="map-wrapper">
+    <div id="map"></div>
+    {{ menu.render() }}
+  </div>
+</div>
+
+<script src="/static/leaflet/leaflet.js"></script>
+<script src="/static/leaflet/leaflet.geometryutil.min.js"></script>
+<script src="/static/leaflet/leaflet-arrowheads.min.js"></script>
+<script src="/static/leaflet/leaflet-ant-path.js"></script>
+<script src="/static/rbush/rbush.min.js"></script>
+<script src="/static/js/menu.js" type="module"></script>
+{% endblock %}

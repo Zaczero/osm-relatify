@@ -1,0 +1,44 @@
+{% extends '_base.jinja2' %}
+{% import '_licenses_modal.jinja2' as licenses_modal with context %}
+{% block body %}
+<div class="container homepage text-center my-5">
+
+  <a href="/">
+    <img src="/static/img/banner.webp" class="img-fluid rounded col-6 mb-4" alt="OSM Relatify banner">
+  </a>
+
+  <div class="mb-3">
+
+    <span>
+      <a href="javascript:;" data-bs-toggle="modal" data-bs-target="#licenses-modal">Licenses</a>
+    </span>
+    <span>
+      <span class="px-0">・</span>
+    </span>
+    <span>
+      <a class="" href="mailto:kamil@monicz.pl">Contact</a>
+    </span>
+    <span>
+      <span class="px-0">・</span>
+    </span>
+    <span>
+      <a class="" href="https://github.com/Zaczero/osm-relatify" target="_blank">
+        <img class="repo-stars" alt="GitHub Repo stars"
+          src="https://img.shields.io/github/stars/Zaczero/osm-relatify?style=social">
+      </a>
+    </span>
+
+  </div>
+
+  <form action="/login" method="post">
+    <button class="btn btn-primary" type="submit">
+      <img src="/static/img/openstreetmap.svg" height="22" alt="OpenStreetMap logo">
+      Login with <b>OpenStreetMap</b>
+    </button>
+  </form>
+
+</div>
+
+{{ licenses_modal.render() }}
+
+{% endblock %}
