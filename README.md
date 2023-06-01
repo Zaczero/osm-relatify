@@ -4,7 +4,7 @@
 [![GitHub](https://img.shields.io/github/license/Zaczero/osm-relatify)](https://github.com/Zaczero/osm-relatify/blob/main/LICENSE)
 [![GitHub repo stars](https://img.shields.io/github/stars/Zaczero/osm-relatify?style=social)](https://github.com/Zaczero/osm-relatify)
 
-OpenStreetMap routes made easy.
+OpenStreetMap public transport made easy.
 
 You can access the **official instance** of osm-relatify at [relatify.monicz.dev](https://relatify.monicz.dev).
 
