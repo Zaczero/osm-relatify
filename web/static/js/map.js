@@ -42,11 +42,11 @@ function updateUrl() {
 map.on('moveend', updateUrl)
 map.on('zoomend', updateUrl)
 
-// map.on('contextmenu', function (e) {
-//     // prevent default right-click context menu from appearing
-//     // this is not to hide anything, it's just for convenience
-//     e.originalEvent.preventDefault()
-// })
+map.on('contextmenu', function (e) {
+    // prevent default right-click context menu from appearing
+    // this is not to hide anything, it's just for convenience
+    e.originalEvent.preventDefault()
+})
 
 // map tiles
 const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

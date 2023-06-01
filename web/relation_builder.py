@@ -200,11 +200,16 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
                 continue
 
             result[relation_id] = relation
-            relation_type = relation['tag'].get('type', None)
+
+            first_way_index = next(
+                i for i, member in enumerate(relation['member'])
+                if member['@type'] == 'way' and not any(member['@role'].startswith(s) for s in ('stop', 'platform')))
 
             way_index = next(
                 i for i, member in enumerate(relation['member'])
                 if int(member['@ref']) == way_id)
+
+            way_index_relative_to_first = way_index - first_way_index
 
             way_role = relation['member'][way_index]['@role']
 
@@ -212,19 +217,25 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
             split_ways_in_order.sort(key=lambda x: x[0])
 
             # determine the order of the split ways
-            if way_index > 0:
+            if way_index_relative_to_first > 0:
                 before_way = parents.ways_map[int(relation['member'][way_index - 1]['@ref'])]
                 before_way['nd'] = before_way.get('nd', [])
 
-                if before_way['nd'] and int(before_way['nd'][-1]['@ref']) == way.nodes[-1]:
-                    split_ways_in_order.reverse()
+                if before_way['nd']:
+                    for check in (0, -1):
+                        if int(before_way['nd'][check]['@ref']) == way.nodes[-1]:
+                            split_ways_in_order.reverse()
+                            break
 
-            elif way_index == 0 and way_index + 1 < len(relation['member']):
+            elif way_index_relative_to_first == 0 and way_index + 1 < len(relation['member']):
                 after_way = parents.ways_map[int(relation['member'][way_index + 1]['@ref'])]
                 after_way['nd'] = after_way.get('nd', [])
 
-                if after_way['nd'] and int(after_way['nd'][0]['@ref']) == way.nodes[0]:
-                    split_ways_in_order.reverse()
+                if after_way['nd']:
+                    for check in (0, -1):
+                        if int(after_way['nd'][check]['@ref']) == way.nodes[0]:
+                            split_ways_in_order.reverse()
+                            break
 
             # remove the original way from the relation member list
             relation['member'].pop(way_index)
