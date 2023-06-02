@@ -255,14 +255,20 @@ def select_neighbors(way: FetchRelationElement, neighbors: list[GraphKey], ways:
 
 
 def get_bus_stops_at(neighbor: GraphKey, id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]]) -> tuple[list[SortedBusEntry], list[SortedBusEntry]]:
+    neighbor_is_forward = neighbor.is_start
+
     visited = []
     almost_visited = []
 
     for sorted_bus in id_sorted_bus_map.get(neighbor.way_id, []):
-        if sorted_bus.right_hand_side is None or neighbor.is_start == sorted_bus.right_hand_side:
+        if sorted_bus.right_hand_side is None or neighbor_is_forward == sorted_bus.right_hand_side:
             visited.append(sorted_bus)
         else:
             almost_visited.append(sorted_bus)
+
+    if not neighbor_is_forward:
+        visited.reverse()
+        almost_visited.reverse()
 
     return visited, almost_visited
 

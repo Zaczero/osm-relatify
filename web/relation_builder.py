@@ -39,7 +39,6 @@ def is_right_hand_side(latLng1: tuple[float, float], latLng2: tuple[float, float
     return cross_product_z > 0
 
 
-# TODO: fix sorting with multiple stops on a single way
 def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection], ways: list[FetchRelationElement]) -> list[SortedBusEntry]:
     latLng_rad_idx_way_map: dict[tuple, tuple[int, FetchRelationElement]] = {}
     tree_coordinates_rad = []
