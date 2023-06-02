@@ -395,6 +395,7 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
 
                     if len(elements_bus_stop) >= 2:
                         if len(others) >= 2:
+                            # TODO: in cases like this, make collection with the closest stop and platform
                             print(f'🚧 Warning: Unexpected number of elements for {name_group_key}: '
                                   f'{len(elements_bus_stop)=}, {len(elements_else)=}, {len(others)=}')
 
@@ -540,7 +541,7 @@ class Overpass:
             r.text,
             force_list=('relation', 'way', 'member', 'tag', 'nd'))['osm']
 
-        relations = data['relation']
+        relations = data.get('relation', [])
         id_relations_map = defaultdict(list)
 
         for relation in relations:
@@ -555,7 +556,7 @@ class Overpass:
                 if member['@type'] == 'way' and member_id in way_ids_set:
                     id_relations_map[member_id].append(relation)
 
-        ways = data['way']
+        ways = data.get('way', [])
         ways_map = {
             int(w['@id']): w
             for w in ways}
