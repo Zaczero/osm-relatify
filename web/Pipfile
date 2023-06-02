@@ -20,6 +20,7 @@ xmltodict = "*"
 numba = "*"
 scipy = "*"
 scikit-learn = "*"
+tenacity = "*"
 
 [dev-packages]
 autopep8 = "*"

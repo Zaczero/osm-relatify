@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from itsdangerous import Serializer
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from config import (CALC_ROUTE_MAX_PROCESSES, CALC_ROUTE_N_PROCESSES,
                     CREATED_BY, SECRET, WEBSITE)
@@ -54,6 +55,7 @@ openstreetmap = OpenStreetMap()
 overpass = Overpass()
 
 
+@retry(wait=wait_exponential(), stop=stop_after_attempt(3))
 async def fetch_user_details(request: Request) -> Optional[dict]:
     if 'token' not in request.cookies:
         return None
