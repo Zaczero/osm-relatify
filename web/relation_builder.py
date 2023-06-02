@@ -128,9 +128,13 @@ def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationM
 
     members = []
 
-    for collection in route.busStops:
+    for i, collection in enumerate(route.busStops):
+        is_first = i == 0
+        is_last = i == len(route.busStops) - 1
+        suffix = '_entry_only' if is_first else ('_exit_only' if is_last else '')
+
         if collection.stop is not None:
-            role = 'stop'
+            role = 'stop' + suffix
 
             if (member := id_relation_member_map.get(collection.stop.id, None)) is not None:
                 if member.role.startswith(role):
@@ -139,7 +143,7 @@ def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationM
             members.append(RelationMember(id=collection.stop.id, type=collection.stop.type, role=role))
 
         if collection.platform is not None:
-            role = 'platform'
+            role = 'platform' + suffix
 
             if (member := id_relation_member_map.get(collection.platform.id, None)) is not None:
                 if member.role.startswith(role):
