@@ -457,7 +457,7 @@ class Overpass:
             minlon=relation['bounds']['minlon'],
             maxlat=relation['bounds']['maxlat'],
             maxlon=relation['bounds']['maxlon'],
-        ).extend(meters=600)
+        ).extend(meters=1500)
 
         timeout = 180
         query = build_bus_query(query_bounds, timeout)
