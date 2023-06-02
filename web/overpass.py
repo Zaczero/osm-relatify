@@ -123,14 +123,15 @@ def is_road(tags: dict[str, str]) -> bool:
         'emergency_access',
     }
 
+    access_designated = False
     access_valid = True
 
     if 'bus' in tags:
-        access_valid = tags['bus'] not in {
+        access_designated = access_valid = tags['bus'] not in {
             'no'
         }
     elif 'psv' in tags:
-        access_valid = tags['psv'] not in {
+        access_designated = access_valid = tags['psv'] not in {
             'no'
         }
     elif 'access' in tags:
@@ -147,7 +148,7 @@ def is_road(tags: dict[str, str]) -> bool:
 
     return all((
         highway_valid,
-        service_valid,
+        (service_valid or access_designated),
         access_valid,
         noarea_valid))
 
