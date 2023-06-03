@@ -25,7 +25,7 @@ from models.fetch_relation import (FetchRelation,
                                    FetchRelationBusStopCollection,
                                    FetchRelationElement, PublicTransport,
                                    assign_none_members, find_start_stop_ways)
-from models.final_route import FinalRoute
+from models.final_route import FinalRoute, WarningSeverity
 from openstreetmap import OpenStreetMap, UploadResult
 from orjson_response import ORJSONResponse
 from overpass import Overpass
@@ -251,7 +251,8 @@ class PostDownloadOsmChangeModel(BaseModel):
 
 @app.post('/download_osm_change')
 async def post_download_osm_change(model: PostDownloadOsmChangeModel):
-    route = from_dict(FinalRoute, model.route, Config(cast=[ElementId, tuple, PublicTransport], strict=True))
+    route = from_dict(FinalRoute, model.route,
+                      Config(cast=[ElementId, tuple, PublicTransport, WarningSeverity], strict=True))
 
     osm_change = await build_osm_change(model.relationId, route, include_changeset_id=False, overpass=overpass, osm=openstreetmap)
 
@@ -268,7 +269,8 @@ async def post_upload_osm(request: Request, model: PostDownloadOsmChangeModel) -
     openstreetmap_user = await openstreetmap_auth.get_authorized_user()
     user_edits = openstreetmap_user['changesets']['count']
 
-    route = from_dict(FinalRoute, model.route, Config(cast=[ElementId, tuple, PublicTransport], strict=True))
+    route = from_dict(FinalRoute, model.route,
+                      Config(cast=[ElementId, tuple, PublicTransport, WarningSeverity], strict=True))
 
     osm_change = await build_osm_change(model.relationId, route, include_changeset_id=True, overpass=overpass, osm=openstreetmap)
 
