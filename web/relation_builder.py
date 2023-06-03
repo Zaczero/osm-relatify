@@ -88,11 +88,11 @@ def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection],
 
 
 def _simplify_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
-    way_ids_parts = [split_element_id(way_id) for way_id in way_ids]
-    result = []
+    way_ids_parts = tuple(split_element_id(way_id) for way_id in way_ids)
+    simplify_blacklist: set[int] = set()
 
+    # pass 1, fill blacklist
     i = 0
-
     while i < len(way_ids_parts):
         way_id, way_id_parts = way_ids[i], way_ids_parts[i]
 
@@ -102,9 +102,32 @@ def _simplify_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
             if last_i < len(way_ids):
                 if all(other_way_id_parts.id == way_id_parts.id for other_way_id_parts in way_ids_parts[i + 1:last_i + 1]):
                     # simplify
-                    result.append(ElementId(way_id_parts.id))
                     i += way_id_parts.maxNum
                     continue
+                else:
+                    simplify_blacklist.add(way_id_parts.id)
+            else:
+                simplify_blacklist.add(way_id_parts.id)
+
+        i += 1
+
+    result = []
+
+    # pass 2, generate results
+    i = 0
+    while i < len(way_ids_parts):
+        way_id, way_id_parts = way_ids[i], way_ids_parts[i]
+
+        if way_id_parts.id not in simplify_blacklist:
+            if way_id_parts.extraNum == 1 or (way_id_parts.extraNum is not None and way_id_parts.extraNum == way_id_parts.maxNum):
+                last_i = i + way_id_parts.maxNum - 1
+
+                if last_i < len(way_ids):
+                    if all(other_way_id_parts.id == way_id_parts.id for other_way_id_parts in way_ids_parts[i + 1:last_i + 1]):
+                        # simplify
+                        result.append(ElementId(way_id_parts.id))
+                        i += way_id_parts.maxNum
+                        continue
 
         result.append(way_id)
         i += 1
@@ -277,9 +300,9 @@ async def build_osm_change(relation_id: int, route: FinalRoute, include_changese
                 element_id_unique_map[element_id] = next_unique_id
                 next_unique_id -= 1
 
-    assert all(
-        len(group) == split_element_id(group[1]).maxNum
-        for group in native_id_element_ids_map.values()), 'Split ways are not complete'
+    for group in native_id_element_ids_map.values():
+        assert len(group) == split_element_id(group[1]).maxNum, \
+            f'Split ways are not complete: {", ".join(f"{k}={v}" for k, v in group.items())}'
 
     split_ways = frozenset(split_ways)
 

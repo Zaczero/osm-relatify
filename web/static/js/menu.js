@@ -1,7 +1,7 @@
 import { processBusStopData } from './busStopsLayer.js'
 import { processRelationDownloadTriggers } from './downloadTriggers.js'
 import { showMessage } from './messageBox.js'
-import { createElementFromHTML } from './utils.js'
+import { createElementFromHTML, deflateCompress } from './utils.js'
 import { processRelationEndpointData } from './waysEndpoint.js'
 import { processRelationWaysData } from './waysLayer.js'
 import { routeData } from './waysRoute.js'
