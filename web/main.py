@@ -25,11 +25,13 @@ from models.fetch_relation import (FetchRelation,
                                    assign_none_members, find_start_stop_ways)
 from models.final_route import FinalRoute
 from openstreetmap import OpenStreetMap, UploadResult
+from orjson_response import ORJSONResponse
 from overpass import Overpass
 from relation_builder import (build_osm_change, get_relation_members,
                               sort_and_upgrade_members)
 from route import calc_bus_route
 from route_warnings import check_for_issues
+from utils import print_run_time
 
 oauth = OAuth()
 oauth.register(
@@ -41,7 +43,7 @@ oauth.register(
     authorize_url='https://www.openstreetmap.org/oauth/authorize'
 )
 
-app = FastAPI()
+app = FastAPI(default_response_class=ORJSONResponse)
 app.add_middleware(SessionMiddleware, secret_key=SECRET)
 app.mount('/static', StaticFiles(directory='static', html=True), name='static')
 
@@ -128,11 +130,12 @@ class PostQueryModel(BaseModel):
 
 @app.post('/query')
 async def post_query(model: PostQueryModel) -> FetchRelation:
-    async with asyncio.TaskGroup() as tg:
-        query_task = tg.create_task(overpass.query_relation(model.relationId))
-        get_task = tg.create_task(openstreetmap.get_relation(model.relationId))
+    with print_run_time('Querying relation data'):
+        async with asyncio.TaskGroup() as tg:
+            query_task = tg.create_task(overpass.query_relation(model.relationId))
+            get_task = tg.create_task(openstreetmap.get_relation(model.relationId))
 
-    bounds, ways, id_map, bus_stop_collections = query_task.result()
+    bounds, cells, ways, id_map, bus_stop_collections = query_task.result()
     relation = get_task.result()
     relation_tags = relation.get('tags', {})
 
@@ -141,12 +144,16 @@ async def post_query(model: PostQueryModel) -> FetchRelation:
             relation_tags.get('public_transport:version') != '2':
         raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Relation must be a PTv2 bus route')
 
-    start_way, stop_way = find_start_stop_ways(ways, id_map, relation)
-    bus_stop_collections = assign_none_members(bus_stop_collections, relation)
+    with print_run_time('Finding start/stop ways'):
+        start_way, stop_way = find_start_stop_ways(ways, id_map, relation)
+
+    with print_run_time('Assigning members for bus stops'):
+        bus_stop_collections = assign_none_members(bus_stop_collections, relation)
 
     return FetchRelation(
         nameOrRef=relation_tags.get('name', relation_tags.get('ref', '')).strip(),
         bounds=bounds,
+        cells=cells,
         tags=relation['tags'],
         startWay=start_way,
         stopWay=stop_way,

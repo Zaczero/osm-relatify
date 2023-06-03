@@ -1,15 +1,18 @@
 from collections import defaultdict
 from itertools import chain
 from math import radians
-from typing import Iterable, NamedTuple
+from typing import Iterable, NamedTuple, Sequence
 
 import xmltodict
 from asyncache import cached
 from cachetools import TTLCache
 from sklearn.neighbors import BallTree
 
-from config import OVERPASS_API_INTERPRETER
+from config import (BUS_COLLECTION_SEARCH_AREA,
+                    DOWNLOAD_RELATION_GRID_CELL_EXPAND,
+                    DOWNLOAD_RELATION_WAY_BB_EXPAND, OVERPASS_API_INTERPRETER)
 from models.bounding_box import BoundingBox
+from models.bounding_box_collection import BoundingBoxCollection
 from models.element_id import ElementId
 from models.fetch_relation import (FetchRelationBusStop,
                                    FetchRelationBusStopCollection,
@@ -42,27 +45,38 @@ def split_by_count(elements: Iterable[dict]) -> list[list[dict]]:
 def build_bb_query(relation_id: int, timeout: int) -> str:
     return \
         f'[out:json][timeout:{timeout}];' \
-        f'relation({relation_id});' \
-        f'out body bb qt;'
+        f'rel({relation_id});' \
+        f'way(r);' \
+        f'out ids bb qt;'
 
 
-def build_bus_query(bb: BoundingBox, timeout: int) -> str:
+def build_bus_query(cell_bbs: Sequence[BoundingBox], cell_bbs_expanded: Sequence[BoundingBox], timeout: int) -> str:
     return \
-        f'[out:json][timeout:{timeout}][bbox:{bb.minlat},{bb.minlon},{bb.maxlat},{bb.maxlon}];' \
-        f'way[highway][!footway];' \
+        f'[out:json][timeout:{timeout}];' \
+        f'(' + \
+        ''.join(
+            f'way[highway][!footway]({bb});'
+            for bb in cell_bbs) + \
+        f');' \
         f'out body qt;' \
         f'out count;' \
         f'>;' \
         f'out skel qt;' \
-        f'out count;' \
-        f'(' \
-        f'node[highway=bus_stop][public_transport=platform];' \
-        f'nwr[highway=platform][public_transport=platform];' \
-        f'node[public_transport=stop_position];' \
+        f'out count;' + \
+        f'(' + \
+        ''.join(
+            f'node[highway=bus_stop][public_transport=platform]({bb});'
+            f'nwr[highway=platform][public_transport=platform]({bb});'
+            f'node[public_transport=stop_position]({bb});'
+            for bb in cell_bbs_expanded) + \
         f');' \
         f'out tags center qt;' \
         f'out count;' \
-        f'rel[public_transport=stop_area]->.r;' \
+        f'(' + \
+        ''.join(
+            f'rel[public_transport=stop_area]({bb});'
+            for bb in cell_bbs_expanded) + \
+        f')->.r;' \
         f'.r out body qt;' \
         f'.r out count;' \
         f'(' \
@@ -82,7 +96,7 @@ def build_bus_query(bb: BoundingBox, timeout: int) -> str:
 def build_parents_query(way_ids: Iterable[int], timeout: int) -> str:
     def _parents(way_id: int) -> str:
         return \
-            f'way(id:{way_id});' \
+            f'way({way_id});' \
             f'(rel(bw);.r;)->.r;'
 
     return \
@@ -288,13 +302,18 @@ def organize_ways(ways: list[dict]) -> tuple[list[dict], dict[ElementId, set[Ele
     return split_ways, connected_ways_map, id_map
 
 
-def deduplicate_bus_stops_by_id(bus_stops: Iterable[FetchRelationBusStop]) -> Iterable[FetchRelationBusStop]:
-    id_set = set()
+def preprocess_elements(elements: Iterable[dict]) -> Sequence[dict]:
+    # deduplicate
+    map = {(e['type'], e['id']): e for e in elements}
+    result = tuple(map.values())
 
-    for bus_stop in bus_stops:
-        if bus_stop.id not in id_set:
-            id_set.add(bus_stop.id)
-            yield bus_stop
+    # extract center
+    for e in result:
+        if 'center' in e:
+            e['lat'] = e['center']['lat']
+            e['lon'] = e['center']['lon']
+
+    return result
 
 
 def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[FetchRelationBusStopCollection]:
@@ -303,8 +322,7 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
     # 3. discard unnamed if in area with named
     # 4. for each named group, pick best platform and best stop
 
-    search_meters = 50
-    search_latLng = search_meters / 111_111
+    search_latLng = BUS_COLLECTION_SEARCH_AREA / 111_111
     search_latLng_rad = radians(search_latLng)
 
     bus_stops_coordinates = tuple(radians_tuple(bus_stop.latLng) for bus_stop in bus_stops)
@@ -433,6 +451,51 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
     return collections
 
 
+def optimize_cells_and_get_bbs(cells: frozenset[tuple[int, int]], *, start_horizontal: bool) -> tuple[Sequence[BoundingBox], Sequence[BoundingBox]]:
+    def merge(sorted: list[tuple[int, int, int, int]]) -> list[tuple[int, int, int, int]]:
+        result = []
+        current = sorted[0]
+
+        for next in sorted[1:]:
+            # merge horizontally
+            if current[2] + 1 == next[0] and current[1] == next[1] and current[3] == next[3]:
+                current = (current[0], current[1], next[2], current[3])
+
+            # merge vertically
+            elif current[3] + 1 == next[1] and current[0] == next[0] and current[2] == next[2]:
+                current = (current[0], current[1], current[2], next[3])
+
+            # add to merged cells if cells can't be merged
+            else:
+                result.append(current)
+                current = next
+
+        # add the last cell
+        result.append(current)
+
+        return result
+
+    cells_bounds = ((i, j, i, j) for i, j in cells)
+
+    if start_horizontal:
+        cells_bounds = sorted(cells_bounds, key=lambda c: (c[1], c[0]))
+    else:
+        cells_bounds = sorted(cells_bounds, key=lambda c: (c[0], c[1]))
+
+    cells_bounds = merge(cells_bounds)
+
+    if start_horizontal:
+        cells_bounds = sorted(cells_bounds, key=lambda c: (c[0], c[1]))
+    else:
+        cells_bounds = sorted(cells_bounds, key=lambda c: (c[1], c[0]))
+
+    cells_bounds = merge(cells_bounds)
+
+    bbs = tuple(BoundingBox.from_grid_cell(*c) for c in cells_bounds)
+
+    return bbs, tuple(bb.extend(unit_degrees=DOWNLOAD_RELATION_GRID_CELL_EXPAND) for bb in bbs)
+
+
 class Overpass:
     def __init__(self):
         self.http = get_http_client(OVERPASS_API_INTERPRETER)
@@ -440,29 +503,40 @@ class Overpass:
     # TODO: check data freshness
 
     @cached(TTLCache(maxsize=128, ttl=60))
-    async def query_relation(self, relation_id: int) -> tuple[BoundingBox, dict[ElementId, FetchRelationElement], dict[int, list[ElementId]], list[FetchRelationBusStopCollection]]:
+    async def query_relation(self, relation_id: int) -> tuple[BoundingBox, frozenset[tuple[int, int]], dict[ElementId, FetchRelationElement], dict[int, list[ElementId]], list[FetchRelationBusStopCollection]]:
         timeout = 60
         query = build_bb_query(relation_id, timeout)
         r = await self.http.post('', data={'data': query}, timeout=timeout * 2)
         r.raise_for_status()
 
-        relation = r.json()['elements'][0]
+        elements: list[dict] = r.json()['elements']
 
-        relation_way_members = set(
-            m['ref']
-            for m in relation['members']
-            if m['type'] == 'way'
-        )
+        relation_way_members = set(e['id'] for e in elements)
+        union_grid_cells: set[tuple[int, int]] = set()
 
-        query_bounds = BoundingBox(
-            minlat=relation['bounds']['minlat'],
-            minlon=relation['bounds']['minlon'],
-            maxlat=relation['bounds']['maxlat'],
-            maxlon=relation['bounds']['maxlon'],
-        ).extend(meters=1500)
+        for way in elements:
+            union_grid_cells.update(BoundingBox(
+                minlat=way['bounds']['minlat'],
+                minlon=way['bounds']['minlon'],
+                maxlat=way['bounds']['maxlat'],
+                maxlon=way['bounds']['maxlon'],
+            )
+                .extend(DOWNLOAD_RELATION_WAY_BB_EXPAND)
+                .get_grid_cells())
+
+        union_grid_cells = frozenset(union_grid_cells)
+        horizontal_bbs_t = optimize_cells_and_get_bbs(union_grid_cells, start_horizontal=True)
+        vertical_bbs_t = optimize_cells_and_get_bbs(union_grid_cells, start_horizontal=False)
+
+        # pick more optimal cells
+        cell_bbs_t = horizontal_bbs_t if len(horizontal_bbs_t) <= len(vertical_bbs_t) else vertical_bbs_t
+        cell_bbs, cell_bbs_expand = cell_bbs_t
+        cell_bbc = BoundingBoxCollection(cell_bbs)
+
+        print(f'[OVERPASS] Downloading {len(cell_bbs)} cells for relation {relation_id}')
 
         timeout = 180
-        query = build_bus_query(query_bounds, timeout)
+        query = build_bus_query(cell_bbs, cell_bbs_expand, timeout)
         r = await self.http.post('', data={'data': query}, timeout=timeout * 2)
         r.raise_for_status()
 
@@ -470,7 +544,9 @@ class Overpass:
         elements_split = split_by_count(elements)
 
         maybe_road_elements = elements_split[0]
+        maybe_road_elements = preprocess_elements(maybe_road_elements)
         node_elements = elements_split[1]
+        node_elements = preprocess_elements(node_elements)
 
         bus_elements = elements_split[2]
 
@@ -483,13 +559,11 @@ class Overpass:
         merge_relations_tags(stop_area_relations, stop_area_stop_position_elements,
                              role='stop', public_transport='stop_position')
 
-        road_elements = [
+        road_elements = tuple(
             e for e in maybe_road_elements
-            if is_road(e['tags'])]
+            if is_road(e['tags']))
 
-        nodes_map = {
-            e['id']: e
-            for e in node_elements}
+        nodes_map = {e['id']: e for e in node_elements}
 
         for e in road_elements:
             e['_member'] = e['id'] in relation_way_members
@@ -514,21 +588,25 @@ class Overpass:
             for e in road_elements
         }
 
-        bus_elements_ex = [
-            e for e in chain(stop_area_platform_elements, stop_area_stop_position_elements, bus_elements)
-            if not is_rail_related(e['tags'])]
+        bus_elements_ex = chain(stop_area_platform_elements, stop_area_stop_position_elements, bus_elements)
+        bus_elements_ex = preprocess_elements(bus_elements_ex)
+        bus_elements_ex = (
+            e for e in bus_elements_ex
+            if not is_rail_related(e['tags']))
 
-        # extract center
-        for e in bus_elements_ex:
-            if 'center' in e:
-                e['lat'] = e['center']['lat']
-                e['lon'] = e['center']['lon']
-
-        bus_stops = (FetchRelationBusStop.from_data(e) for e in bus_elements_ex)
-        bus_stops = tuple(deduplicate_bus_stops_by_id(bus_stops))
+        bus_stops = tuple(FetchRelationBusStop.from_data(e) for e in bus_elements_ex)
         bus_stop_collections = create_bus_stop_collections(bus_stops)
+        bus_stop_collections = tuple(
+            c for c in bus_stop_collections
+            if cell_bbc.contains(c.best.latLng))
 
-        return query_bounds, ways, id_map, bus_stop_collections
+        global_bb = BoundingBox(
+            minlat=min(bb.minlat for bb in cell_bbs),
+            minlon=min(bb.minlon for bb in cell_bbs),
+            maxlat=max(bb.maxlat for bb in cell_bbs),
+            maxlon=max(bb.maxlon for bb in cell_bbs))
+
+        return global_bb, union_grid_cells, ways, id_map, bus_stop_collections
 
     @cached(TTLCache(maxsize=512, ttl=90))
     async def query_parents(self, way_ids_set: frozenset[int]) -> QueryParentsResult:

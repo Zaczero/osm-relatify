@@ -18,9 +18,10 @@ h2 = "*"
 dacite = "*"
 xmltodict = "*"
 numba = "*"
-scipy = "*"
 scikit-learn = "*"
 tenacity = "*"
+rtree = "*"
+orjson = "*"
 
 [dev-packages]
 autopep8 = "*"

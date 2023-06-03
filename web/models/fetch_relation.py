@@ -100,6 +100,7 @@ class FetchRelationBusStopCollection:
 class FetchRelation:
     nameOrRef: str
     bounds: BoundingBox
+    cells: frozenset[tuple[int, int]]
     tags: dict[str, str]
     startWay: FetchRelationElement
     stopWay: FetchRelationElement
