@@ -10,8 +10,21 @@ export let stopWay = null
 
 export function processRelationEndpointData(fetchData) {
     if (fetchData) {
-        setStartMarker(fetchData.startWay)
-        setStopMarker(fetchData.stopWay)
+        if (fetchData.fetchMerge) {
+            if (startWay && !fetchData.ways[startWay.id]) {
+                setStartMarker(null)
+                clearPopup()
+            }
+
+            if (stopWay && !fetchData.ways[stopWay.id]) {
+                setStopMarker(null)
+                clearPopup()
+            }
+        }
+        else {
+            setStartMarker(fetchData.startWay)
+            setStopMarker(fetchData.stopWay)
+        }
     }
     else {
         setStartMarker(null)

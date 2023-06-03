@@ -2,7 +2,7 @@ import asyncio
 import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
-from typing import Optional
+from typing import Optional, Sequence
 
 from authlib.integrations.starlette_client import OAuth
 from cachetools import TTLCache
@@ -19,6 +19,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from config import (CALC_ROUTE_MAX_PROCESSES, CALC_ROUTE_N_PROCESSES,
                     CREATED_BY, SECRET, WEBSITE)
 from deflate_middleware import DeflateRoute
+from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
 from models.fetch_relation import (FetchRelation,
                                    FetchRelationBusStopCollection,
@@ -128,16 +129,27 @@ async def logout(request: Request):
 
 class PostQueryModel(BaseModel):
     relationId: int
+    downloadHistory: dict | None = None
+    downloadTargets: tuple[dict, ...] | None = None
 
 
 @app.post('/query')
 async def post_query(model: PostQueryModel) -> FetchRelation:
+    assert (model.downloadHistory is None) == (model.downloadTargets is None)
+
+    if model.downloadHistory is not None:
+        download_hist = from_dict(DownloadHistory, model.downloadHistory, Config(cast=[tuple], strict=True))
+        download_targets = tuple(from_dict(Cell, t, Config(cast=[], strict=True)) for t in model.downloadTargets)
+    else:
+        download_hist = None
+        download_targets = None
+
     with print_run_time('Querying relation data'):
         async with asyncio.TaskGroup() as tg:
-            query_task = tg.create_task(overpass.query_relation(model.relationId))
+            query_task = tg.create_task(overpass.query_relation(model.relationId, download_hist, download_targets))
             get_task = tg.create_task(openstreetmap.get_relation(model.relationId))
 
-    bounds, cells, ways, id_map, bus_stop_collections = query_task.result()
+    bounds, download_hist, download_triggers, ways, id_map, bus_stop_collections = query_task.result()
     relation = get_task.result()
     relation_tags = relation.get('tags', {})
 
@@ -153,9 +165,11 @@ async def post_query(model: PostQueryModel) -> FetchRelation:
         bus_stop_collections = assign_none_members(bus_stop_collections, relation)
 
     return FetchRelation(
+        fetchMerge=len(download_hist.history) > 1,
         nameOrRef=relation_tags.get('name', relation_tags.get('ref', '')).strip(),
         bounds=bounds,
-        cells=cells,
+        downloadHistory=download_hist,
+        downloadTriggers=download_triggers,
         tags=relation['tags'],
         startWay=start_way,
         stopWay=stop_way,

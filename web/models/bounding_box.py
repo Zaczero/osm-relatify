@@ -3,9 +3,10 @@ from math import cos, degrees, radians
 from typing import Self
 
 from config import DOWNLOAD_RELATION_GRID_SIZE
+from models.download_history import Cell
 
 
-@dataclass(frozen=True, kw_only=True, slots=True)
+@dataclass(frozen=True, slots=True)
 class BoundingBox:
     minlat: float
     minlon: float
@@ -30,25 +31,18 @@ class BoundingBox:
             minlat=self.minlat - lat_delta,
             minlon=self.minlon - lng_delta,
             maxlat=self.maxlat + lat_delta,
-            maxlon=self.maxlon + lng_delta,
-        )
+            maxlon=self.maxlon + lng_delta)
 
-    def get_grid_cells(self) -> set[tuple[int, int]]:
-        min_x, min_y = self.to_grid_cell()
-        max_x, max_y = BoundingBox(
-            minlat=self.maxlat,
-            minlon=self.maxlon,
-            maxlat=self.maxlat,
-            maxlon=self.maxlon).to_grid_cell()
+    def get_grid_cells(self, *, expand: int = 0) -> set[Cell]:
+        min_x = int(self.minlon // DOWNLOAD_RELATION_GRID_SIZE)
+        min_y = int(self.minlat // DOWNLOAD_RELATION_GRID_SIZE)
+        max_x = int(self.maxlon // DOWNLOAD_RELATION_GRID_SIZE)
+        max_y = int(self.maxlat // DOWNLOAD_RELATION_GRID_SIZE)
+
         return {
-            (x, y)
-            for x in range(min_x, max_x + 1)
-            for y in range(min_y, max_y + 1)}
-
-    def to_grid_cell(self) -> tuple[int, int]:
-        return (
-            int(self.minlon // DOWNLOAD_RELATION_GRID_SIZE),
-            int(self.minlat // DOWNLOAD_RELATION_GRID_SIZE))
+            Cell(x, y)
+            for x in range(min_x - expand, max_x + 1 + expand)
+            for y in range(min_y - expand, max_y + 1 + expand)}
 
     @classmethod
     def from_grid_cell(cls, x: int, y: int, x_max: int = None, y_max: int = None) -> Self:

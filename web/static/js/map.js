@@ -106,3 +106,32 @@ class OsmButton extends L.Control {
 }
 
 new OsmButton({ position: 'topright' }).addTo(map)
+
+// data download progress
+class DownloadBar extends L.Control {
+    constructor(options) {
+        super(options)
+    }
+
+    onAdd = map => {
+        const div = createElementFromHTML(`
+            <div id="download-bar" class="leaflet-bar leaflet-control leaflet-control-custom download-bar d-none">
+                <p class="mb-0">Downloading map data...</p>
+                <div class="progress" style="height:8px">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%"></div>
+                </div>
+            </div>`)
+
+        return div
+    }
+}
+
+new DownloadBar({ position: 'bottomright' }).addTo(map)
+
+export const showDownloadBar = () => {
+    document.getElementById('download-bar').classList.remove('d-none')
+}
+
+export const hideDownloadBar = () => {
+    document.getElementById('download-bar').classList.add('d-none')
+}

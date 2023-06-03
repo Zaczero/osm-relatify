@@ -1,4 +1,5 @@
 import { processBusStopData } from './busStopsLayer.js'
+import { processRelationDownloadTriggers } from './downloadTriggers.js'
 import { showMessage } from './messageBox.js'
 import { createElementFromHTML } from './utils.js'
 import { processRelationEndpointData } from './waysEndpoint.js'
@@ -80,15 +81,7 @@ loadRelationForm.addEventListener('submit', (e) => {
             if (!data)
                 return
 
-            processRelationTags(data)
-            switchView('edit')
-
-            // order is important here
-            processRelationEndpointData(data)
-            processRelationWaysData(data)
-
-            // order is not important here
-            processBusStopData(data)
+            processFetchRelationData(data)
         })
         .catch(error => {
             console.error(error)
@@ -106,18 +99,32 @@ loadRelationForm.addEventListener('submit', (e) => {
         })
 })
 
+export const processFetchRelationData = data => {
+    processRelationTags(data)
+    switchView('edit')
+
+    // order is important here
+    processRelationEndpointData(data)
+    processRelationWaysData(data)
+
+    // order is not important here
+    processRelationDownloadTriggers(data)
+    processBusStopData(data)
+}
+
 export const processRelationTags = data => {
-    editTags.innerHTML = ''
+    const dummyDiv = document.createElement('div')
 
     if (data.nameOrRef)
-        editTags.appendChild(createElementFromHTML(`<tr><td colspan="2">${data.nameOrRef}</td></tr>`))
+        dummyDiv.appendChild(createElementFromHTML(`<tr><td colspan="2">${data.nameOrRef}</td></tr>`))
 
     const interestingTags = ['fixme', 'note', 'from', 'to', 'network', 'operator']
 
-    for (const tag of interestingTags) {
+    for (const tag of interestingTags)
         if (data.tags[tag])
-            editTags.appendChild(createElementFromHTML(`<tr><td class="key">${tag}</td><td class="value">${data.tags[tag]}</td></tr>`))
-    }
+            dummyDiv.appendChild(createElementFromHTML(`<tr><td class="key">${tag}</td><td class="value">${data.tags[tag]}</td></tr>`))
+
+    editTags.innerHTML = dummyDiv.innerHTML
 }
 
 export const processRouteWarnings = data => {
@@ -148,6 +155,7 @@ const unload = () => {
 
     processRelationEndpointData(null)
     processRelationWaysData(null)
+    processRelationDownloadTriggers(null)
     processBusStopData(null)
 
     relationId = null
@@ -210,15 +218,16 @@ sumitBackBtn.onclick = () => {
     switchView('edit')
 }
 
-submitUploadBtn.onclick = () => {
+submitUploadBtn.onclick = async () => {
     submitUploadBtn.disabled = true
 
     fetch('/upload_osm', {
         method: 'POST',
         headers: {
+            'Content-Encoding': 'deflate',
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
+        body: await deflateCompress({
             relationId: relationId,
             route: routeData
         })
@@ -270,15 +279,16 @@ submitUploadBtn.onclick = () => {
         })
 }
 
-submitDownloadBtn.onclick = () => {
+submitDownloadBtn.onclick = async () => {
     submitDownloadBtn.disabled = true
 
     fetch('/download_osm_change', {
         method: 'POST',
         headers: {
+            'Content-Encoding': 'deflate',
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
+        body: await deflateCompress({
             relationId: relationId,
             route: routeData
         })

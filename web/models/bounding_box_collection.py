@@ -8,7 +8,7 @@ class BoundingBoxCollection:
         self.idx = index.Index()
 
         for i, bb in enumerate(bbs):
-            self.idx.insert(i, (bb.minlon, bb.minlat, bb.maxlon, bb.maxlat))
+            self.idx.insert(i, (bb.minlat, bb.minlon, bb.maxlat, bb.maxlon))
 
     def contains(self, latLng: tuple[float, float]) -> bool:
-        return bool(self.idx.contains((latLng[0], latLng[1], latLng[0], latLng[1])))
+        return bool(list(self.idx.intersection(latLng)))

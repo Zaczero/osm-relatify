@@ -2,7 +2,7 @@ import { map, openInOpenStreetMap } from './map.js'
 
 let popup = null
 
-function clearPopup() {
+export function clearBusStopsPopup() {
     if (popup) {
         popup.removeFrom(map)
         popup = null
@@ -10,7 +10,7 @@ function clearPopup() {
 }
 
 export function showContextMenu(e, stop) {
-    clearPopup()
+    clearBusStopsPopup()
 
     popup = L.popup(e.latlng, {
         content: `

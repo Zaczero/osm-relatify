@@ -1,4 +1,4 @@
-import { showContextMenu } from './busStopsContext.js'
+import { clearBusStopsPopup, showContextMenu } from './busStopsContext.js'
 import { map } from './map.js'
 import { waysRBush } from './waysLayer.js'
 import { requestCalcBusRoute } from './waysRoute.js'
@@ -9,8 +9,48 @@ const inactiveBusStopsLayer = L.layerGroup().addTo(map)
 const activeBusStopsLayer = L.layerGroup().addTo(map)
 
 export function processBusStopData(fetchData) {
-    if (fetchData)
-        busStopData = fetchData.busStops
+    if (fetchData) {
+        if (fetchData.fetchMerge) {
+            const memberSet = new Set()
+
+            if (busStopData) {
+                for (const entry of busStopData) {
+                    if (entry.platform) {
+                        if (entry.platform.member)
+                            memberSet.add(`${entry.platform.type},${entry.platform.id}`)
+                    }
+                    else if (entry.stop) {
+                        if (entry.stop.member)
+                            memberSet.add(`${entry.stop.type},${entry.stop.id}`)
+                    }
+                }
+            }
+
+            busStopData = fetchData.busStops
+
+            for (const entry of busStopData) {
+                if (entry.platform) {
+                    const member = memberSet.has(`${entry.platform.type},${entry.platform.id}`)
+
+                    entry.platform.member = member
+
+                    if (entry.stop)
+                        entry.stop.member = member
+                }
+                else if (entry.stop) {
+                    const member = memberSet.has(`${entry.stop.type},${entry.stop.id}`)
+
+                    if (entry.platform)
+                        entry.platform.member = member
+
+                    entry.stop.member = member
+                }
+            }
+        }
+        else {
+            busStopData = fetchData.busStops
+        }
+    }
     else
         busStopData = null
 
@@ -18,6 +58,7 @@ export function processBusStopData(fetchData) {
 }
 
 function onBusStopDataChanged() {
+    clearBusStopsPopup()
     updateBusStopsVisibility()
     requestCalcBusRoute()
 }

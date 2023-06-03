@@ -1,4 +1,6 @@
+import secrets
 from collections import defaultdict
+from dataclasses import replace
 from itertools import chain
 from math import radians
 from typing import Iterable, NamedTuple, Sequence
@@ -6,6 +8,7 @@ from typing import Iterable, NamedTuple, Sequence
 import xmltodict
 from asyncache import cached
 from cachetools import TTLCache
+from cachetools.keys import hashkey
 from sklearn.neighbors import BallTree
 
 from config import (BUS_COLLECTION_SEARCH_AREA,
@@ -13,8 +16,9 @@ from config import (BUS_COLLECTION_SEARCH_AREA,
                     DOWNLOAD_RELATION_WAY_BB_EXPAND, OVERPASS_API_INTERPRETER)
 from models.bounding_box import BoundingBox
 from models.bounding_box_collection import BoundingBoxCollection
+from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
-from models.fetch_relation import (FetchRelationBusStop,
+from models.fetch_relation import (FetchRelation, FetchRelationBusStop,
                                    FetchRelationBusStopCollection,
                                    FetchRelationElement, PublicTransport)
 from utils import get_http_client, radians_tuple
@@ -451,7 +455,7 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
     return collections
 
 
-def optimize_cells_and_get_bbs(cells: frozenset[tuple[int, int]], *, start_horizontal: bool) -> tuple[Sequence[BoundingBox], Sequence[BoundingBox]]:
+def optimize_cells_and_get_bbs(cells: Sequence[Cell], *, start_horizontal: bool) -> tuple[Sequence[BoundingBox], Sequence[BoundingBox]]:
     def merge(sorted: list[tuple[int, int, int, int]]) -> list[tuple[int, int, int, int]]:
         result = []
         current = sorted[0]
@@ -475,7 +479,7 @@ def optimize_cells_and_get_bbs(cells: frozenset[tuple[int, int]], *, start_horiz
 
         return result
 
-    cells_bounds = ((i, j, i, j) for i, j in cells)
+    cells_bounds = ((c.x, c.y, c.x, c.y) for c in cells)
 
     if start_horizontal:
         cells_bounds = sorted(cells_bounds, key=lambda c: (c[1], c[0]))
@@ -496,52 +500,109 @@ def optimize_cells_and_get_bbs(cells: frozenset[tuple[int, int]], *, start_horiz
     return bbs, tuple(bb.extend(unit_degrees=DOWNLOAD_RELATION_GRID_CELL_EXPAND) for bb in bbs)
 
 
+def get_download_triggers(bbc: BoundingBoxCollection, cells: Sequence[Cell], ways: dict[ElementId, FetchRelationElement]) -> dict[ElementId, Sequence[tuple[int, int]]]:
+    cells_set = frozenset(cells)
+    result: dict[ElementId, Sequence[Cell]] = {}
+
+    for way_id, way in ways.items():
+        way_new_cells = set()
+
+        for latLng in way.latLngs:
+            if bbc.contains(latLng):
+                continue
+
+            new_cells = BoundingBox(
+                minlat=latLng[0], minlon=latLng[1],
+                maxlat=latLng[0], maxlon=latLng[1]) \
+                .get_grid_cells(expand=1)  # 3x3 grid
+
+            way_new_cells |= new_cells - cells_set
+
+        if way_new_cells:
+            result[way_id] = tuple(way_new_cells)
+
+    return dict(result)
+
+
 class Overpass:
     def __init__(self):
         self.http = get_http_client(OVERPASS_API_INTERPRETER)
 
     # TODO: check data freshness
 
+    @cached(TTLCache(maxsize=1024, ttl=7200))  # 2 hours
+    async def _query_relation_history_post(self, session: str, query: str, timeout: float) -> list[list[dict]]:
+        r = await self.http.post('', data={'data': query}, timeout=timeout * 2)
+        r.raise_for_status()
+
+        elements: list[dict] = r.json()['elements']
+        return split_by_count(elements)
+
+    async def _query_relation_history(self, relation_id: int, download_hist: DownloadHistory) -> tuple[list[list[dict]], BoundingBoxCollection]:
+        all_elements_split = None
+        all_bbs = []
+
+        for cells in download_hist.history:
+            hor_bbs_t = optimize_cells_and_get_bbs(cells, start_horizontal=True)
+            ver_bbs_t = optimize_cells_and_get_bbs(cells, start_horizontal=False)
+
+            # pick more optimal cells
+            cell_bbs_t = hor_bbs_t if len(hor_bbs_t) <= len(ver_bbs_t) else ver_bbs_t
+            cell_bbs, cell_bbs_expand = cell_bbs_t
+            all_bbs.extend(cell_bbs)
+
+            print(f'[OVERPASS] Downloading {len(cell_bbs)} cells for relation {relation_id}')
+
+            timeout = 180
+            query = build_bus_query(cell_bbs, cell_bbs_expand, timeout)
+            elements_split = await self._query_relation_history_post(download_hist.session, query, timeout)
+
+            if all_elements_split is None:
+                all_elements_split = elements_split
+            else:
+                for i, elements in enumerate(elements_split):
+                    all_elements_split[i].extend(elements)
+
+        bbc = BoundingBoxCollection(all_bbs)
+
+        return all_elements_split, bbc
+
     @cached(TTLCache(maxsize=128, ttl=60))
-    async def query_relation(self, relation_id: int) -> tuple[BoundingBox, frozenset[tuple[int, int]], dict[ElementId, FetchRelationElement], dict[int, list[ElementId]], list[FetchRelationBusStopCollection]]:
-        timeout = 60
-        query = build_bb_query(relation_id, timeout)
-        r = await self.http.post('', data={'data': query}, timeout=timeout * 2)
-        r.raise_for_status()
+    async def query_relation(self, relation_id: int, download_hist: DownloadHistory | None, download_targets: Sequence[Cell] | None) -> tuple[BoundingBox, DownloadHistory, dict[ElementId, Sequence[tuple[int, int]]], dict[ElementId, FetchRelationElement], dict[int, list[ElementId]], list[FetchRelationBusStopCollection]]:
+        if download_targets is None:
+            timeout = 60
+            query = build_bb_query(relation_id, timeout)
+            r = await self.http.post('', data={'data': query}, timeout=timeout * 2)
+            r.raise_for_status()
 
-        elements: list[dict] = r.json()['elements']
+            elements: list[dict] = r.json()['elements']
 
-        relation_way_members = set(e['id'] for e in elements)
-        union_grid_cells: set[tuple[int, int]] = set()
+            relation_way_members = set(e['id'] for e in elements)
+            union_grid_cells_set: set[Cell] = set()
 
-        for way in elements:
-            union_grid_cells.update(BoundingBox(
-                minlat=way['bounds']['minlat'],
-                minlon=way['bounds']['minlon'],
-                maxlat=way['bounds']['maxlat'],
-                maxlon=way['bounds']['maxlon'],
-            )
-                .extend(DOWNLOAD_RELATION_WAY_BB_EXPAND)
-                .get_grid_cells())
+            for way in elements:
+                union_grid_cells_set.update(BoundingBox(
+                    minlat=way['bounds']['minlat'],
+                    minlon=way['bounds']['minlon'],
+                    maxlat=way['bounds']['maxlat'],
+                    maxlon=way['bounds']['maxlon'],
+                )
+                    .extend(DOWNLOAD_RELATION_WAY_BB_EXPAND)
+                    .get_grid_cells())
 
-        union_grid_cells = frozenset(union_grid_cells)
-        horizontal_bbs_t = optimize_cells_and_get_bbs(union_grid_cells, start_horizontal=True)
-        vertical_bbs_t = optimize_cells_and_get_bbs(union_grid_cells, start_horizontal=False)
+            union_grid_cells = tuple(union_grid_cells_set)
+        else:
+            # in merge mode, members are set by the client
+            relation_way_members = set()
 
-        # pick more optimal cells
-        cell_bbs_t = horizontal_bbs_t if len(horizontal_bbs_t) <= len(vertical_bbs_t) else vertical_bbs_t
-        cell_bbs, cell_bbs_expand = cell_bbs_t
-        cell_bbc = BoundingBoxCollection(cell_bbs)
+            union_grid_cells = download_targets
 
-        print(f'[OVERPASS] Downloading {len(cell_bbs)} cells for relation {relation_id}')
+        if download_hist is None:
+            download_hist = DownloadHistory(session=secrets.token_urlsafe(16), history=(union_grid_cells,))
+        else:
+            download_hist = replace(download_hist, history=download_hist.history + (union_grid_cells,))
 
-        timeout = 180
-        query = build_bus_query(cell_bbs, cell_bbs_expand, timeout)
-        r = await self.http.post('', data={'data': query}, timeout=timeout * 2)
-        r.raise_for_status()
-
-        elements: list[dict] = r.json()['elements']
-        elements_split = split_by_count(elements)
+        elements_split, bbc = await self._query_relation_history(relation_id, download_hist)
 
         maybe_road_elements = elements_split[0]
         maybe_road_elements = preprocess_elements(maybe_road_elements)
@@ -598,15 +659,12 @@ class Overpass:
         bus_stop_collections = create_bus_stop_collections(bus_stops)
         bus_stop_collections = tuple(
             c for c in bus_stop_collections
-            if cell_bbc.contains(c.best.latLng))
+            if bbc.contains(c.best.latLng))
 
-        global_bb = BoundingBox(
-            minlat=min(bb.minlat for bb in cell_bbs),
-            minlon=min(bb.minlon for bb in cell_bbs),
-            maxlat=max(bb.maxlat for bb in cell_bbs),
-            maxlon=max(bb.maxlon for bb in cell_bbs))
+        global_bb = BoundingBox(*bbc.idx.bounds)
+        download_triggers = get_download_triggers(bbc, union_grid_cells, ways)
 
-        return global_bb, union_grid_cells, ways, id_map, bus_stop_collections
+        return global_bb, download_hist, download_triggers, ways, id_map, bus_stop_collections
 
     @cached(TTLCache(maxsize=512, ttl=90))
     async def query_parents(self, way_ids_set: frozenset[int]) -> QueryParentsResult:

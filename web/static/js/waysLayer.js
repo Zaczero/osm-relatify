@@ -1,4 +1,5 @@
 import { updateBusStopsVisibility } from './busStopsLayer.js'
+import { downloadTrigger } from './downloadTriggers.js'
 import { map } from './map.js'
 import { showContextMenu, startWay, stopWay } from './waysEndpoint.js'
 import { requestCalcBusRoute } from './waysRoute.js'
@@ -9,14 +10,36 @@ export let waysRBush = null
 const waysLayer = L.layerGroup().addTo(map)
 
 export function processRelationWaysData(fetchData) {
-    if (fetchData)
-        waysData = fetchData.ways
+    if (fetchData) {
+        if (fetchData.fetchMerge) {
+            const memberSet = new Set()
+
+            if (waysData) {
+                for (const way of Object.values(waysData)) {
+                    if (way.member) {
+                        const wayBaseId = way.id.split('_')[0]
+                        memberSet.add(wayBaseId)
+                    }
+                }
+            }
+
+            waysData = fetchData.ways
+
+            for (const way of Object.values(waysData)) {
+                const wayBaseId = way.id.split('_')[0]
+                way.member = memberSet.has(wayBaseId)
+            }
+        }
+        else {
+            waysData = fetchData.ways
+        }
+    }
     else
         waysData = null
 
     onWaysDataChanged()
 
-    if (waysData)
+    if (waysData && (!fetchData || !fetchData.fetchMerge))
         fitToBounds(fetchData.bounds)
 }
 
@@ -159,8 +182,13 @@ function addWayToLayer(way) {
         if (way.id === startWay.id || way.id === stopWay.id)
             return
 
-        waysData[way.id].member = !way.member
+        const newMember = !way.member
+
+        waysData[way.id].member = newMember
         onWaysDataChanged()
+
+        if (newMember)
+            downloadTrigger(way.id)
     }
 
     const onMouseOverHandler = () => {

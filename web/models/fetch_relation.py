@@ -1,9 +1,10 @@
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Self
+from typing import Self, Sequence
 
 from models.bounding_box import BoundingBox
+from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
 from utils import haversine_distance
 
@@ -98,9 +99,11 @@ class FetchRelationBusStopCollection:
 
 @dataclass(frozen=True, kw_only=True, slots=True)
 class FetchRelation:
+    fetchMerge: bool
     nameOrRef: str
     bounds: BoundingBox
-    cells: frozenset[tuple[int, int]]
+    downloadHistory: DownloadHistory
+    downloadTriggers: dict[ElementId, tuple[Cell, ...]]
     tags: dict[str, str]
     startWay: FetchRelationElement
     stopWay: FetchRelationElement

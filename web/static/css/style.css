@@ -168,6 +168,11 @@
   font-weight: bold;
 }
 
+.download-bar {
+  padding: .1em .5em .5em;
+  background: white;
+}
+
 /* ANIMATION */
 
 .animation-container {
