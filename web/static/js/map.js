@@ -54,20 +54,17 @@ const baseLayers = {
     'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: attribution,
         maxZoom: 19,
-        subdomains: 'abc',
-        detectRetina: true,
+        subdomains: 'abc'
     }),
     'OpenStreetMap DE': L.tileLayer('https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png', {
         attribution: attribution,
         maxZoom: 19,
-        subdomains: 'abcd',
-        detectRetina: true,
+        subdomains: 'abcd'
     }),
     'OpenStreetMap FR': L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
         attribution: attribution,
         maxZoom: 20,
-        subdomains: 'abc',
-        detectRetina: true,
+        subdomains: 'abc'
     }),
 }
 
