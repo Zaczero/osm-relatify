@@ -27,3 +27,40 @@ export const createElementFromHTML = html => {
     body.innerHTML = html
     return body.firstChild
 }
+
+export const deflateCompress = async data => {
+    if (typeof data !== 'string')
+        data = JSON.stringify(data)
+
+    const encoder = new TextEncoder()
+    const compressionStream = new CompressionStream('deflate-raw')
+
+    const writer = compressionStream.writable.getWriter()
+    writer.write(encoder.encode(data))
+    writer.close()
+
+    const reader = compressionStream.readable.getReader()
+
+    let chunks = []
+    let totalLength = 0
+
+    while (true) {
+        const { done, value } = await reader.read()
+
+        if (done)
+            break
+
+        chunks.push(value)
+        totalLength += value.length
+    }
+
+    let concatenatedChunks = new Uint8Array(totalLength)
+    let position = 0
+
+    for (let chunk of chunks) {
+        concatenatedChunks.set(chunk, position)
+        position += chunk.length
+    }
+
+    return concatenatedChunks
+}

@@ -1,6 +1,7 @@
 import { clearAntPath, processRouteAntPath } from './antPathLayer.js'
 import { busStopData } from './busStopsLayer.js'
 import { processRouteStops, processRouteWarnings, relationId } from './menu.js'
+import { deflateCompress } from './utils.js'
 import { startWay, stopWay } from './waysEndpoint.js'
 import { waysData } from './waysLayer.js'
 
@@ -47,7 +48,7 @@ export function requestCalcBusRoute() {
 
 let calcBusRouteAbortController = null
 
-function calcBusRoute(startWay, stopWay, ways, busStops) {
+const calcBusRoute = async (startWay, stopWay, ways, busStops) => {
     if (calcBusRouteAbortController)
         calcBusRouteAbortController.abort()
 
@@ -56,9 +57,10 @@ function calcBusRoute(startWay, stopWay, ways, busStops) {
     fetch('/calc_bus_route', {
         method: 'POST',
         headers: {
+            'Content-Encoding': 'deflate',
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
+        body: await deflateCompress({
             relationId: relationId,
             startWay: startWay,
             stopWay: stopWay,

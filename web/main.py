@@ -18,6 +18,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from config import (CALC_ROUTE_MAX_PROCESSES, CALC_ROUTE_N_PROCESSES,
                     CREATED_BY, SECRET, WEBSITE)
+from deflate_middleware import DeflateRoute
 from models.element_id import ElementId
 from models.fetch_relation import (FetchRelation,
                                    FetchRelationBusStopCollection,
@@ -45,6 +46,7 @@ oauth.register(
 
 app = FastAPI(default_response_class=ORJSONResponse)
 app.add_middleware(SessionMiddleware, secret_key=SECRET)
+app.router.route_class = DeflateRoute
 app.mount('/static', StaticFiles(directory='static', html=True), name='static')
 
 secret = Serializer(SECRET)
