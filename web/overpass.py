@@ -205,6 +205,14 @@ def is_roundabout(tags: dict[str, str]) -> bool:
     }
 
 
+def is_bus_related(tags: dict[str, str]) -> bool:
+    bus_valid = tags.get('bus', 'no') in {
+        'yes'
+    }
+
+    return bus_valid
+
+
 def is_rail_related(tags: dict[str, str]) -> bool:
     rail_valid = 'railway' in tags
 
@@ -686,7 +694,7 @@ class Overpass:
         bus_elements_ex = preprocess_elements(bus_elements_ex)
         bus_elements_ex = (
             e for e in bus_elements_ex
-            if not is_rail_related(e['tags']))
+            if is_bus_related(e['tags']) or not is_rail_related(e['tags']))
 
         bus_stops = tuple(FetchRelationBusStop.from_data(e) for e in bus_elements_ex)
         bus_stop_collections = create_bus_stop_collections(bus_stops)
