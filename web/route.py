@@ -3,6 +3,7 @@ import itertools
 import math
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import replace
 from itertools import chain
 from typing import NamedTuple, Self, Union
 
@@ -512,16 +513,27 @@ def finalize_route(best_path: BestPath, ways: dict[ElementId, FetchRelationEleme
         latLngs if i == 0 else latLngs[1:]
         for i, latLngs in enumerate(route_latLngs_gen)))
 
+    route_latLngs_set = set(route_latLngs)
+
     id_collection_map = {collection.best.id: collection for collection in bus_stop_collections}
 
-    route_bus_stops = tuple(
-        id_collection_map[stop_id]
-        for stop_id, _ in sorted(best_path.visited_bus_stops.items(), key=lambda x: x[1]))
+    route_bus_stops = []
+
+    for stop_id, _ in sorted(best_path.visited_bus_stops.items(), key=lambda x: x[1]):
+        collection = id_collection_map[stop_id]
+
+        if collection.stop is not None and collection.stop.latLng not in route_latLngs_set:
+            collection = replace(collection, stop=None)
+
+        if collection.platform is None and collection.stop is None:
+            continue
+
+        route_bus_stops.append(collection)
 
     return FinalRoute(
         ways=route_ways,
         latLngs=route_latLngs,
-        busStops=route_bus_stops)
+        busStops=tuple(route_bus_stops))
 
 
 async def calc_bus_route(ways_members: dict[ElementId, FetchRelationElement], start_way: ElementId, end_way: ElementId, bus_stop_collections: list[FetchRelationBusStopCollection], executor: ProcessPoolExecutor, n_processes: int) -> FinalRoute:

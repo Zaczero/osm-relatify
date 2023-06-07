@@ -84,7 +84,7 @@ def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection],
             right_hand_side=right_hand_side))
 
     assert not any(e.sort_index == -1 for e in result)
-    return sorted(result, key=lambda x: x.sort_index)
+    return sorted(result, key=lambda x: x.sort_index)  # TODO: sort stop, platform on the same sort_index
 
 
 def _simplify_way_ids(way_ids: list[ElementId]) -> list[ElementId]:

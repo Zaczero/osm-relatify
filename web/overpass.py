@@ -21,7 +21,7 @@ from models.element_id import ElementId
 from models.fetch_relation import (FetchRelation, FetchRelationBusStop,
                                    FetchRelationBusStopCollection,
                                    FetchRelationElement, PublicTransport)
-from utils import get_http_client, radians_tuple
+from utils import get_http_client, haversine_distance, radians_tuple
 
 # TODO: right hand side detection by querying roundabouts, and first/last bus stop
 
@@ -410,47 +410,80 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
             platforms.sort(key=lambda p: p.id)
             stops.sort(key=lambda s: s.id)
 
-            def pick_best(elements: list[FetchRelationBusStop], others: list[FetchRelationBusStop]) -> list[FetchRelationBusStop]:
-                if len(elements) >= 2:
-                    elements_bus_stop = tuple(e for e in elements if e.highway == 'bus_stop')
-                    elements_else = tuple(e for e in elements if e.highway != 'bus_stop')
+            def pick_best(elements: list[FetchRelationBusStop], *, limit_else: bool) -> tuple[Sequence[FetchRelationBusStop], bool]:
+                if not elements:
+                    return tuple(), False
 
-                    if len(elements_bus_stop) >= 2:
-                        if len(others) >= 2:
-                            # TODO: in cases like this, make collection with the closest stop and platform
-                            print(f'🚧 Warning: Unexpected number of elements for {name_group_key}: '
-                                  f'{len(elements_bus_stop)=}, {len(elements_else)=}, {len(others)=}')
+                elements_explicit = tuple(e for e in elements if e.highway == 'bus_stop')
 
-                    elif len(elements_bus_stop) == 0:
-                        print(f'🚧 Warning: Unexpected number of elements for {name_group_key}: '
-                              f'{len(elements_bus_stop)=}, {len(elements_else)=}, {len(others)=}')
+                if elements_explicit:
+                    return elements_explicit, True
 
-                    return elements_bus_stop if elements_bus_stop else (elements_else[0],)
-                elif len(elements) == 1:
-                    return (elements[0],)
+                elements_implicit = tuple(e for e in elements if e.highway != 'bus_stop')
+
+                return ((elements_implicit[0],) if limit_else else elements_implicit), False
+
+            best_platforms, platforms_explicit = pick_best(platforms, limit_else=True)
+            best_stops, stops_explicit = pick_best(stops, limit_else=False)
+
+            if platforms_explicit and stops_explicit:
+                print(f'🚧 Warning: Unexpected explicit platforms and stops for {name_group_key}')
+
+            if platforms_explicit:
+                if len(stops) >= 2:
+                    stops_tree = BallTree(tuple(radians_tuple(stop.latLng) for stop in stops), metric='haversine')
+
+                    query_indices = stops_tree.query(
+                        tuple(radians_tuple(best_platform.latLng) for best_platform in best_platforms),
+                        k=1,
+                        return_distance=False,
+                        sort_results=False)
+
+                    query_stops = (stops[i] for i in query_indices[:, 0])
+                elif len(stops) == 1:
+                    query_stops = (stops[0],) * len(best_platforms)
                 else:
-                    return (None,)
+                    query_stops = (None,) * len(best_platforms)
 
-            best_platforms = pick_best(platforms, stops)
-            best_stops = pick_best(stops, platforms)
+                for best_platform, best_stop in zip(best_platforms, query_stops):
+                    collections.append(FetchRelationBusStopCollection(
+                        platform=best_platform,
+                        stop=best_stop))
 
-            if len(best_platforms) <= 1 or len(best_stops) <= 1:
-                for best_platform in best_platforms:
+                continue
+
+            assert len(best_platforms) <= 1
+
+            if stops_explicit:
+                if len(best_stops) <= 1:
+                    for best_platform in best_platforms:
+                        for best_stop in best_stops:
+                            collections.append(FetchRelationBusStopCollection(
+                                platform=best_platform,
+                                stop=best_stop))
+                else:
                     for best_stop in best_stops:
                         collections.append(FetchRelationBusStopCollection(
-                            platform=best_platform,
+                            platform=None,
                             stop=best_stop))
 
-            else:
+                continue
+
+            if best_platforms:
                 for best_platform in best_platforms:
                     collections.append(FetchRelationBusStopCollection(
                         platform=best_platform,
                         stop=None))
 
+                continue
+
+            if best_stops:
                 for best_stop in best_stops:
                     collections.append(FetchRelationBusStopCollection(
                         platform=None,
                         stop=best_stop))
+
+                continue
 
     return collections
 
