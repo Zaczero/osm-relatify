@@ -8,6 +8,8 @@ OpenStreetMap public transport made easy.
 
 You can access the **official instance** of osm-relatify at [relatify.monicz.dev](https://relatify.monicz.dev).
 
+<img width="60%" src="https://github.com/Zaczero/osm-relatify/blob/main/resources/application-preview.png?raw=true" alt="Application preview">
+
 ## About
 
 OSM Relatify is a user-friendly web application specifically designed for editing public transport relations within OpenStreetMap (OSM).
