@@ -8,9 +8,43 @@ OpenStreetMap public transport made easy.
 
 You can access the **official instance** of osm-relatify at [relatify.monicz.dev](https://relatify.monicz.dev).
 
-## Highlights
+## About
 
-*I will finish this README soon.*
+OSM Relatify is a user-friendly web application specifically designed for editing public transport relations within OpenStreetMap (OSM).
+
+The application relies on the OSM data to be (more-or-less) accurately tagged. Incorrect or poor tagging may necessitate manual corrections using an OSM editor, like iD or JOSM.
+
+Please note that, for now, OSM Relatify only supports bus relations.
+
+## Features
+
+### Supported
+
+- ✅ Bus routes
+- ✅ One-way streets
+- ✅ Roundabouts
+- ✅ Right-hand traffic
+- ✅ `public_transport:version=2`
+- ✅ `public_transport=platform`
+- ✅ `public_transport=stop_position`
+- ✅ `public_transport=stop_area`
+
+### Planned
+
+- ⏳ Custom changeset comment
+- ⏳ Tag editing
+- ⏳ Creating new relations
+- ⏳ Creating new bus stops
+- ⏳ Left-hand traffic
+- ⏳ Relation `type=restriction`
+- ⏳ `direction=*`
+- ⏳ `oneway=-1`
+- ⏳ Trams, trolleybuses, trains, etc.
+
+### Unsupported
+
+- ❌ Exceptionally poor tagging
+- ❌ `public_transport:version=1`
 
 ## Footer
 
