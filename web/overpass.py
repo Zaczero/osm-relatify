@@ -464,11 +464,12 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
 
             if stops_explicit:
                 if len(best_stops) <= 1:
-                    for best_platform in best_platforms:
-                        for best_stop in best_stops:
-                            collections.append(FetchRelationBusStopCollection(
-                                platform=best_platform,
-                                stop=best_stop))
+                    best_platform = best_platforms[0] if best_platforms else None
+
+                    for best_stop in best_stops:
+                        collections.append(FetchRelationBusStopCollection(
+                            platform=best_platform,
+                            stop=best_stop))
                 else:
                     for best_stop in best_stops:
                         collections.append(FetchRelationBusStopCollection(

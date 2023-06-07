@@ -7,7 +7,16 @@ import { requestCalcBusRoute } from './waysRoute.js'
 export let waysData = null
 export let waysRBush = null
 
+map.createPane('nonMemberBuffers').style.zIndex = 394
+map.createPane('memberBuffers').style.zIndex = 395
+map.createPane('nonMemberBuffers2').style.zIndex = 396
+map.createPane('memberBuffers2').style.zIndex = 397
+map.createPane('nonMemberWays').style.zIndex = 398
+map.createPane('memberWays').style.zIndex = 399
+
 const waysLayer = L.layerGroup().addTo(map)
+
+let idGroupMap = new Map()
 
 export function processRelationWaysData(fetchData) {
     if (fetchData) {
@@ -86,6 +95,7 @@ function onWaysDataChanged() {
 
 function updateWaysVisibility() {
     if (!waysData) {
+        idGroupMap = new Map()
         waysLayer.clearLayers()
         return
     }
@@ -100,52 +110,22 @@ function updateWaysVisibility() {
         visibleWays.add(way.id)
 
         // .. and all the ways it is connected to
-        for (const connectedWayId of way.connectedTo) {
+        for (const connectedWayId of way.connectedTo)
             visibleWays.add(connectedWayId)
-        }
     }
 
-    // store each line in a separate array,
-    // so that we can add them in the right order
-    const lines = {
-        memberLines: [],
-        memberBuffers: [],
-        memberBuffers2: [],
-        nonMemberLines: [],
-        nonMemberBuffers: [],
-        nonMemberBuffers2: [],
-    }
+    for (const wayId of visibleWays)
+        addWay(waysData[wayId])
 
-    for (const wayId of visibleWays) {
-        const way = waysData[wayId]
-        const [lineEx, buffer, buffer2] = addWayToLayer(way)
-
-        if (way.member) {
-            lines.memberLines.push(...lineEx)
-            lines.memberBuffers.push(buffer)
-            lines.memberBuffers2.push(buffer2)
-        }
-        else {
-            lines.nonMemberLines.push(...lineEx)
-            lines.nonMemberBuffers.push(buffer)
-            lines.nonMemberBuffers2.push(buffer2)
-        }
-    }
-
-    waysLayer.clearLayers()
-
-    for (const line of [
-        ...lines.nonMemberBuffers,
-        ...lines.memberBuffers,
-        ...lines.nonMemberBuffers2,
-        ...lines.memberBuffers2,
-        ...lines.nonMemberLines,
-        ...lines.memberLines]) {
-        line.addTo(waysLayer)
-    }
+    for (const wayId of idGroupMap.keys())
+        if (!visibleWays.has(wayId))
+            removeGroupFromLayers(wayId)
 }
 
-function addWayToLayer(way) {
+const addWay = way => {
+    if (idGroupMap.has(way.id))
+        return
+
     const lineColor = way.member ? 'orangered' : '#909090'
     const lineHoverColor = way.member ? 'darkred' : '#4C4C4C'
     const lineWeight = way.member ? 7 : 5
@@ -153,19 +133,20 @@ function addWayToLayer(way) {
     const line = L.polyline(way.latLngs, {
         color: lineColor,
         weight: lineWeight,
+        pane: way.member ? 'memberWays' : 'nonMemberWays',
     })
 
     const buffer = L.polyline(way.latLngs, {
         color: 'transparent',
         weight: lineWeight + 18,
+        pane: way.member ? 'memberBuffers' : 'nonMemberBuffers',
     })
 
     const buffer2 = L.polyline(way.latLngs, {
         color: 'transparent',
         weight: lineWeight + 9,
+        pane: way.member ? 'memberBuffers2' : 'nonMemberBuffers2',
     })
-
-    const decorators = []
 
     if (way.oneway) {
         line.arrowheads({
@@ -178,6 +159,8 @@ function addWayToLayer(way) {
         })
     }
 
+    const group = [line, buffer, buffer2]
+
     const onClickHandler = () => {
         if (way.id === startWay.id || way.id === stopWay.id)
             return
@@ -185,6 +168,7 @@ function addWayToLayer(way) {
         const newMember = !way.member
 
         waysData[way.id].member = newMember
+        removeGroupFromLayers(way.id)
         onWaysDataChanged()
 
         if (newMember)
@@ -209,17 +193,42 @@ function addWayToLayer(way) {
         showContextMenu(e, way)
     }
 
-    for (const e of [line, ...decorators, buffer, buffer2]) {
+    for (const e of group) {
         e.on('click', onClickHandler)
         e.on('mouseover', onMouseOverHandler)
         e.on('mouseout', onMouseOutHandler)
 
-        if (way.member) {
+        if (way.member)
             e.on('contextmenu', onContextMenuHandler)
-        }
     }
 
-    return [[line, ...decorators], buffer, buffer2]
+    addGroupToLayers(way.id, group)
+}
+
+const addGroupToLayers = (id, group) => {
+    if (idGroupMap.has(id))
+        return
+
+    const [line, buffer, buffer2] = group
+
+    waysLayer.addLayer(buffer)
+    waysLayer.addLayer(buffer2)
+    waysLayer.addLayer(line)
+
+    idGroupMap.set(id, group)
+}
+
+const removeGroupFromLayers = id => {
+    if (!idGroupMap.has(id))
+        return
+
+    const [line, buffer, buffer2] = idGroupMap.get(id)
+
+    waysLayer.removeLayer(buffer)
+    waysLayer.removeLayer(buffer2)
+    waysLayer.removeLayer(line)
+
+    idGroupMap.delete(id)
 }
 
 function fitToBounds(bounds) {
