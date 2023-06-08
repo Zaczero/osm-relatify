@@ -211,7 +211,7 @@ def _set_changeset_placeholder(data: dict, include_changeset_id: bool) -> None:
         data.pop('@changeset', None)
 
 
-def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset[int], parents: QueryParentsResult, native_id_element_ids_map: dict[int, dict[int, ElementId]], id_way_map: dict[ElementId, FetchRelationElement], element_id_unique_map: dict[ElementId, int]) -> list[dict]:
+def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset[int], parents: QueryParentsResult, native_id_element_ids_map: dict[int, dict[int, ElementId]], id_way_map: dict[ElementId, FetchRelationElement], element_id_unique_map: dict[ElementId, int], unique_native_id_map: dict[int, int]) -> list[dict]:
     result: dict[int, dict] = {}
 
     # iterate over the split ways
@@ -244,7 +244,9 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
 
             # determine the order of the split ways
             if way_index_relative_to_first > 0:
-                before_way = parents.ways_map[int(relation['member'][way_index - 1]['@ref'])]
+                before_way_id = int(relation['member'][way_index - 1]['@ref'])
+                before_way_id = unique_native_id_map.get(before_way_id, before_way_id)
+                before_way = parents.ways_map[before_way_id]
                 before_way['nd'] = before_way.get('nd', [])
 
                 if before_way['nd']:
@@ -254,7 +256,9 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
                             break
 
             elif way_index_relative_to_first == 0 and way_index + 1 < len(relation['member']):
-                after_way = parents.ways_map[int(relation['member'][way_index + 1]['@ref'])]
+                after_way_id = int(relation['member'][way_index + 1]['@ref'])
+                after_way_id = unique_native_id_map.get(after_way_id, after_way_id)
+                after_way = parents.ways_map[after_way_id]
                 after_way['nd'] = after_way.get('nd', [])
 
                 if after_way['nd']:
@@ -283,6 +287,7 @@ async def build_osm_change(relation_id: int, route: FinalRoute, include_changese
     split_ways: set[int] = set()
     native_id_element_ids_map: dict[int, dict[int, ElementId]] = defaultdict(dict)
     element_id_unique_map: dict[ElementId, int] = {}
+    unique_native_id_map: dict[int, int] = {}
     next_unique_id: int = -1
 
     # iterate over route members and check if they are split
@@ -298,6 +303,7 @@ async def build_osm_change(relation_id: int, route: FinalRoute, include_changese
                 element_id_unique_map[element_id] = element_id_parts.id
             else:
                 element_id_unique_map[element_id] = next_unique_id
+                unique_native_id_map[next_unique_id] = element_id_parts.id
                 next_unique_id -= 1
 
     for group in native_id_element_ids_map.values():
@@ -358,7 +364,8 @@ async def build_osm_change(relation_id: int, route: FinalRoute, include_changese
             parents=parents,
             native_id_element_ids_map=native_id_element_ids_map,
             id_way_map=id_way_map,
-            element_id_unique_map=element_id_unique_map)
+            element_id_unique_map=element_id_unique_map,
+            unique_native_id_map=unique_native_id_map)
 
         for parent_relation in parent_relations:
             # strip unnecessary data
