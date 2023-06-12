@@ -1,4 +1,5 @@
 from dataclasses import replace
+from itertools import zip_longest
 
 from models.element_id import ElementId
 from models.fetch_relation import (FetchRelationBusStopCollection,
@@ -63,7 +64,7 @@ def _check_for_not_enough_bus_stops(route: FinalRoute) -> FinalRouteWarning | No
 
 
 def _check_for_members_unchanged(route: FinalRoute, relation_members: list[RelationMember]) -> FinalRouteWarning | None:
-    for route_member, relation_member in zip(route.members, relation_members):
+    for route_member, relation_member in zip_longest(route.members, relation_members):
         if route_member != relation_member:
             return None
 
