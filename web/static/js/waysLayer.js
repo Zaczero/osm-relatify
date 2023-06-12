@@ -21,22 +21,24 @@ let idGroupMap = new Map()
 export function processRelationWaysData(fetchData) {
     if (fetchData) {
         if (fetchData.fetchMerge) {
-            const memberSet = new Set()
+            const memberMap = new Map()
 
             if (waysData) {
                 for (const way of Object.values(waysData)) {
-                    if (way.member) {
-                        const wayBaseId = way.id.split('_')[0]
-                        memberSet.add(wayBaseId)
-                    }
+                    memberMap.set(way.id, way.member)
+                    memberMap.set(way.id.split('_')[0], way.member)
                 }
             }
 
             waysData = fetchData.ways
 
             for (const way of Object.values(waysData)) {
-                const wayBaseId = way.id.split('_')[0]
-                way.member = memberSet.has(wayBaseId)
+                const memberCandidates = [
+                    memberMap.get(way.id),
+                    memberMap.get(way.id.split('_')[0]),
+                ]
+
+                way.member = memberCandidates.find(m => m !== undefined) || false
             }
         }
         else {
