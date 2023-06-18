@@ -50,13 +50,16 @@ Please note that, for now, OSM Relatify only supports bus relations.
 
 ## Footer
 
-### Contact
+### Contact me
 
-- Email: [kamil@monicz.pl](mailto:kamil@monicz.pl)
-- LinkedIn: [linkedin.com/in/kamil-monicz](https://www.linkedin.com/in/kamil-monicz/)
+https://monicz.dev/#get-in-touch
+
+### Support my work
+
+https://monicz.dev/#support-my-work
 
 ### License
 
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+This project is licensed under the GNU Affero General Public License v3.0.
 
-You can find the full text of the license in the repository at [LICENSE](https://github.com/Zaczero/osm-revert/blob/main/LICENSE).
+The complete license text can be accessed in the repository at [LICENSE](https://github.com/Zaczero/osm-revert/blob/main/LICENSE).
