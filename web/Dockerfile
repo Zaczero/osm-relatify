@@ -9,7 +9,7 @@ ARG NIX_TRANSFER_DIR
 
 COPY shell.nix ./
 
-RUN nix-channel --add https://channels.nixos.org/nixos-22.11 nixpkgs && \
+RUN nix-channel --add https://channels.nixos.org/nixos-23.05 nixpkgs && \
     nix-channel --update && \
     mkdir --parents $NIX_TRANSFER_DIR && \
     nix-env --profile $NIX_PROFILE --install --attr buildInputs --file shell.nix && \
@@ -41,7 +41,7 @@ ENV PIPENV_VENV_IN_PROJECT=1
 
 COPY --chown=1000:1000 Pipfile* ./
 
-RUN pipenv install --deploy --ignore-pipfile --keep-outdated && \
+RUN pipenv sync && \
     pipenv --clear
 
 ENV PATH="/app/.venv/bin:$PATH"
