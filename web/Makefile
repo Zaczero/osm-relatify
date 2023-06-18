@@ -1,4 +1,4 @@
-.PHONY update
+.PHONY: update
 
 update:
 	docker run --privileged --rm tonistiigi/binfmt --install all
