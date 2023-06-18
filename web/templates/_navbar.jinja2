@@ -1,6 +1,6 @@
 {% import '_licenses_modal.jinja2' as licenses_modal with context %}
 {% macro render() %}
-<nav class="navbar navbar-expand py-1">
+<nav class="navbar navbar-expand-lg py-1">
     <div class="container-fluid">
 
         <span class="navbar-brand">
@@ -14,36 +14,48 @@
             </span>
         </span>
 
-        <ul class="navbar-nav me-auto">
-            <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="modal" data-bs-target="#licenses-modal">Licenses</button>
-            </li>
-            <li class="nav-item">
-                <span class="nav-link px-0">・</span>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="mailto:kamil@monicz.pl">Contact</a>
-            </li>
-            <li class="nav-item">
-                <span class="nav-link px-0">・</span>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="https://github.com/Zaczero/osm-relatify/issues" target="_blank">
-                    Bug report
-                </a>
-            </li>
-            <li class="nav-item">
-                <span class="nav-link px-0">・</span>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="https://github.com/Zaczero/osm-relatify" target="_blank">
-                    <img class="repo-stars" alt="GitHub Repo stars"
-                        src="https://img.shields.io/github/stars/Zaczero/osm-relatify?style=social">
-                </a>
-            </li>
-        </ul>
+        <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse">
+            <span class="navbar-toggler-icon"></span>
+        </button>
 
-        <ul class="navbar-nav">
+        <div id="navbar-collapse" class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="modal" data-bs-target="#licenses-modal">Licenses</button>
+                </li>
+                <li class="nav-item d-none d-lg-inline">
+                    <span class="nav-link px-0">・</span>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="mailto:kamil@monicz.pl">Contact</a>
+                </li>
+                <li class="nav-item d-none d-lg-inline">
+                    <span class="nav-link px-0">・</span>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://monicz.dev/#support-my-work" target="_blank">Donate</a>
+                </li>
+                <li class="nav-item d-none d-lg-inline">
+                    <span class="nav-link px-0">・</span>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://github.com/Zaczero/osm-relatify/issues" target="_blank">
+                        Bug report
+                    </a>
+                </li>
+                <li class="nav-item d-none d-lg-inline">
+                    <span class="nav-link px-0">・</span>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://github.com/Zaczero/osm-relatify" target="_blank">
+                        <img class="repo-stars" alt="GitHub Repo stars"
+                            src="https://img.shields.io/github/stars/Zaczero/osm-relatify?style=social">
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <ul class="navbar-nav ms-auto">
             <li class="nav-item d-flex align-items-center">
                 {% if user.img.href %}
                 <img class="me-1 rounded" src="{{ user.img.href }}" width="28" height="28" alt="Profile picture">
