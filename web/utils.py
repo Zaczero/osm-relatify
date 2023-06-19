@@ -36,7 +36,6 @@ def get_http_client(base_url: str = '', *, auth: tuple | None = None, headers: d
         follow_redirects=True,
         timeout=30,
         limits=httpx.Limits(max_connections=8, max_keepalive_connections=2, keepalive_expiry=30),
-        http2=True,
         auth=auth,
         headers=headers)
 
