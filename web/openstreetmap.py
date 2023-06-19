@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from io import BytesIO
-from typing import Iterable, NamedTuple
+from typing import Iterable
 
 import xmltodict
 from asyncache import cached

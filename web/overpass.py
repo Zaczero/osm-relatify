@@ -8,7 +8,6 @@ from typing import Iterable, NamedTuple, Sequence
 import xmltodict
 from asyncache import cached
 from cachetools import TTLCache
-from cachetools.keys import hashkey
 from sklearn.neighbors import BallTree
 
 from config import (BUS_COLLECTION_SEARCH_AREA,
@@ -18,10 +17,10 @@ from models.bounding_box import BoundingBox
 from models.bounding_box_collection import BoundingBoxCollection
 from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
-from models.fetch_relation import (FetchRelation, FetchRelationBusStop,
+from models.fetch_relation import (FetchRelationBusStop,
                                    FetchRelationBusStopCollection,
                                    FetchRelationElement, PublicTransport)
-from utils import get_http_client, haversine_distance, radians_tuple
+from utils import get_http_client, radians_tuple
 
 # TODO: right hand side detection by querying roundabouts, and first/last bus stop
 
