@@ -1,7 +1,7 @@
 # <img height="24" src="https://github.com/Zaczero/osm-relatify/blob/main/web/static/img/icon.png?raw=true" alt="🗺️"> OSM Relatify
 
 ![Python version](https://img.shields.io/badge/python-v3.11-blue)
-[![GitHub](https://img.shields.io/github/license/Zaczero/osm-relatify)](https://github.com/Zaczero/osm-relatify/blob/main/LICENSE)
+[![Project license](https://img.shields.io/github/license/Zaczero/osm-relatify)](https://github.com/Zaczero/osm-relatify/blob/main/LICENSE)
 [![Support my work](https://img.shields.io/badge/%E2%99%A5%EF%B8%8F%20Support%20my%20work-purple)](https://monicz.dev/#support-my-work)
 [![GitHub repo stars](https://img.shields.io/github/stars/Zaczero/osm-relatify?style=social)](https://github.com/Zaczero/osm-relatify)
 
