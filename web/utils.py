@@ -31,7 +31,14 @@ def get_http_client(base_url: str = '', *, auth: tuple | None = None, headers: d
 
     headers['User-Agent'] = USER_AGENT
 
-    return httpx.AsyncClient(base_url=base_url, timeout=30, http2=True, auth=auth, headers=headers)
+    return httpx.AsyncClient(
+        base_url=base_url,
+        follow_redirects=True,
+        timeout=30,
+        limits=httpx.Limits(max_connections=8, max_keepalive_connections=2, keepalive_expiry=30),
+        http2=True,
+        auth=auth,
+        headers=headers)
 
 
 def ensure_list(obj: dict | list[dict]) -> list[dict]:
