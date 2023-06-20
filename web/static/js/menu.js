@@ -146,7 +146,7 @@ export const processRouteWarnings = data => {
             <div class="warning warning-${severity_text}">
                 <div class="warning-message">${warning.message}</div>
                 <div>
-                    <button class="btn btn-sm btn-primary ms-auto">Show me</button>
+                    <button class="btn btn-sm btn-primary ms-2">Show me</button>
                 </div>
             </div>`)
             editWarnings.appendChild(child)
