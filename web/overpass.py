@@ -152,6 +152,12 @@ def is_road(tags: dict[str, str]) -> bool:
         access_designated = access_valid = tags['psv'] not in {
             'no'
         }
+    elif 'motor_vehicle' in tags:
+        access_valid = tags['motor_vehicle'] not in {
+            'private',
+            'customers',
+            'no'
+        }
     elif 'access' in tags:
         access_valid = tags['access'] not in {
             'private',
