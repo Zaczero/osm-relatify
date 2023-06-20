@@ -118,7 +118,7 @@ export const processRelationTags = data => {
     if (data.nameOrRef)
         dummyDiv.appendChild(createElementFromHTML(`<tr><td colspan="2">${data.nameOrRef}</td></tr>`))
 
-    const interestingTags = ['fixme', 'note', 'from', 'to', 'network', 'operator']
+    const interestingTags = ['fixme', 'note', 'from', 'via', 'to', 'network', 'operator']
 
     for (const tag of interestingTags)
         if (data.tags[tag])
