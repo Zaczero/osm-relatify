@@ -644,6 +644,9 @@ class Overpass:
 
             union_grid_cells = download_targets
 
+        if not union_grid_cells:
+            raise ValueError('No grid cells to download')
+
         if download_hist is None:
             download_hist = DownloadHistory(session=secrets.token_urlsafe(16), history=(union_grid_cells,))
         else:

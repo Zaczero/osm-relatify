@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from httpx import HTTPStatusError
 from itsdangerous import Serializer
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
@@ -145,18 +146,24 @@ async def post_query(model: PostQueryModel) -> FetchRelation:
         download_targets = None
 
     with print_run_time('Querying relation data'):
-        async with asyncio.TaskGroup() as tg:
-            query_task = tg.create_task(overpass.query_relation(model.relationId, download_hist, download_targets))
-            get_task = tg.create_task(openstreetmap.get_relation(model.relationId))
+        query_task = asyncio.create_task(overpass.query_relation(model.relationId, download_hist, download_targets))
+        get_task = asyncio.create_task(openstreetmap.get_relation(model.relationId))
 
-    bounds, download_hist, download_triggers, ways, id_map, bus_stop_collections = query_task.result()
-    relation = get_task.result()
-    relation_tags = relation.get('tags', {})
+        try:
+            relation = await get_task
+        except HTTPStatusError as e:
+            if e.response.status_code == status.HTTP_404_NOT_FOUND:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, 'Relation not found')
+            raise
 
-    if relation_tags.get('type') != 'route' or \
-            relation_tags.get('route') != 'bus' or \
-            relation_tags.get('public_transport:version') != '2':
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Relation must be a PTv2 bus route')
+        relation_tags = relation.get('tags', {})
+
+        if relation_tags.get('type') != 'route' or \
+                relation_tags.get('route') != 'bus' or \
+                relation_tags.get('public_transport:version') != '2':
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Relation must be a PTv2 bus route')
+
+        bounds, download_hist, download_triggers, ways, id_map, bus_stop_collections = await query_task
 
     with print_run_time('Finding start/stop ways'):
         start_way, stop_way = find_start_stop_ways(ways, id_map, relation)
