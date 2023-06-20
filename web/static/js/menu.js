@@ -1,5 +1,6 @@
 import { processBusStopData } from './busStopsLayer.js'
 import { processRelationDownloadTriggers } from './downloadTriggers.js'
+import { setView } from './map.js'
 import { showMessage } from './messageBox.js'
 import { createElementFromHTML, deflateCompress } from './utils.js'
 import { processRelationEndpointData } from './waysEndpoint.js'
@@ -140,10 +141,23 @@ export const processRouteWarnings = data => {
         const [severity_text, severity_level] = warning.severity
         highestSeverityLevel = Math.max(highestSeverityLevel, severity_level)
 
-        editWarnings.appendChild(createElementFromHTML(`
-        <div class="warning warning-${severity_text}">
-            ${warning.message}
-        </div>`))
+        if (warning.message == 'Some ways are not used') {
+            const child = createElementFromHTML(`
+            <div class="warning warning-${severity_text}">
+                <div class="warning-message">${warning.message}</div>
+                <div>
+                    <button class="btn btn-sm btn-primary ms-auto">Show me</button>
+                </div>
+            </div>`)
+            editWarnings.appendChild(child)
+            child.querySelector('button').onclick = () => setView(warning.extra[0])
+        }
+        else {
+            editWarnings.appendChild(createElementFromHTML(`
+            <div class="warning warning-${severity_text}">
+                <div class="warning-message">${warning.message}</div>
+            </div>`))
+        }
     }
 
     if (highestSeverityLevel == 0)

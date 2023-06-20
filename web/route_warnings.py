@@ -18,7 +18,8 @@ def _check_for_unused_ways(route: FinalRoute, ways: dict[ElementId, FetchRelatio
     if unused_way_ids:
         return FinalRouteWarning(
             severity=WarningSeverity.HIGH,
-            message='Some ways are not used')
+            message='Some ways are not used',
+            extra=tuple(map(lambda way_id: ways[way_id].midpoint, unused_way_ids)))
 
     return None
 
@@ -79,6 +80,7 @@ def check_for_issues(route: FinalRoute, ways: dict[ElementId, FetchRelationEleme
         _check_for_end_not_reached(route, end_way),
         _check_for_bus_stop_far_away(route, bus_stop_collections),
         _check_for_bus_stop_not_reached(route, bus_stop_collections),
+        _check_for_not_enough_bus_stops(route),
         _check_for_members_unchanged(route, relation_members)]
 
     sorted_warnings = tuple(sorted(filter(None, warnings), key=lambda warning: warning.severity.value[1], reverse=True))

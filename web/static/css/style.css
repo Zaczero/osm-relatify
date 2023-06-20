@@ -89,14 +89,17 @@
   padding: 6px 10px;
   border: 1px dashed transparent;
   border-radius: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .warning:not(:last-child) {
   margin-bottom: .5em;
 }
 
-.warning::before {
-  content: '🛈';
+.warning-message::before {
+  content: '🛈 ';
 }
 
 .warning-LOW {

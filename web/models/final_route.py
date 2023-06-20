@@ -25,6 +25,7 @@ class WarningSeverity(Enum):
 class FinalRouteWarning:
     severity: WarningSeverity
     message: str
+    extra: tuple = None
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)

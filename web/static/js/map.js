@@ -135,3 +135,7 @@ export const showDownloadBar = () => {
 export const hideDownloadBar = () => {
     document.getElementById('download-bar').classList.add('d-none')
 }
+
+export const setView = latLng => {
+    map.setView(latLng, 19)
+}
