@@ -316,6 +316,15 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
                 intersection_entered_at = None
                 intersection_bus_stops_count = None
 
+            if intersection_entered_at is None or intersection_bus_stops_count < len(s.visited_bus_stops) + len(s.almost_visited_bus_stops):
+                new_intersection_bus_stops_snapshot_changed = True
+                new_intersection_bus_stops_snapshot = s.intersection_bus_stops_snapshot.copy()
+                new_intersection_bus_stops_snapshot[intersection_id] = (
+                    exit_at_key, len(s.visited_bus_stops) + len(s.almost_visited_bus_stops))
+            else:
+                new_intersection_bus_stops_snapshot_changed = False
+                new_intersection_bus_stops_snapshot = s.intersection_bus_stops_snapshot
+
             for neighbor, neighbor_angle in valid_neighbors:
                 neighbor_way = ways[neighbor.way_id]
 
@@ -345,11 +354,7 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
                     new_visited_bus_stops = s.visited_bus_stops
                     new_almost_visited_bus_stops = s.almost_visited_bus_stops
 
-                new_intersection_bus_stops_snapshot = s.intersection_bus_stops_snapshot.copy()
-
-                if intersection_entered_at is None or intersection_bus_stops_count < len(new_visited_bus_stops):
-                    new_intersection_bus_stops_snapshot[intersection_id] = (exit_at_key, len(new_visited_bus_stops))
-                elif len(neighbors) > 1:  # intersection_bus_stops_count == len(new_visited_bus_stops)
+                if not new_intersection_bus_stops_snapshot_changed and len(neighbors) > 1:
                     # allow only going back if there are no new bus stops (to prevent useless loops)
                     if neighbor != intersection_entered_at:
                         continue
