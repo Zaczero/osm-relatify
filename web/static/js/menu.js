@@ -1,6 +1,6 @@
 import { processBusStopData } from './busStopsLayer.js'
 import { processRelationDownloadTriggers } from './downloadTriggers.js'
-import { setView } from './map.js'
+import { map } from './map.js'
 import { showMessage } from './messageBox.js'
 import { createElementFromHTML, deflateCompress } from './utils.js'
 import { processRelationEndpointData } from './waysEndpoint.js'
@@ -37,7 +37,7 @@ const switchView = name => {
     activeView = name
 }
 
-loadRelationForm.addEventListener('submit', (e) => {
+loadRelationForm.addEventListener('submit', e => {
     e.preventDefault()
 
     if (loadRelationBtn.classList.contains('is-loading'))
@@ -150,7 +150,7 @@ export const processRouteWarnings = data => {
                 </div>
             </div>`)
             editWarnings.appendChild(child)
-            child.querySelector('button').onclick = () => setView(warning.extra[0])
+            child.querySelector('button').onclick = () => map.setView(warning.extra[0], 19)
         }
         else {
             editWarnings.appendChild(createElementFromHTML(`
@@ -340,3 +340,8 @@ submitDownloadBtn.onclick = async () => {
             submitDownloadBtn.disabled = false
         })
 }
+
+// support &load=1 in query string
+const urlParams = new URLSearchParams(window.location.search)
+if (urlParams.get('load') === '1')
+    loadRelationBtn.click()
