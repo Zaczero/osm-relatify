@@ -1,8 +1,8 @@
 import asyncio
 from collections import defaultdict
 from dataclasses import replace
-from itertools import chain
-from typing import NamedTuple
+from itertools import chain, zip_longest
+from typing import Generator, Iterable, NamedTuple
 
 import xmltodict
 from numba import njit
@@ -16,7 +16,7 @@ from models.final_route import FinalRoute
 from models.relation_member import RelationMember
 from openstreetmap import OpenStreetMap
 from overpass import Overpass, QueryParentsResult
-from utils import EARTH_RADIUS, radians_tuple
+from utils import EARTH_RADIUS, haversine_distance, radians_tuple
 
 
 class SortedBusEntry(NamedTuple):
@@ -39,15 +39,33 @@ def is_right_hand_side(latLng1: tuple[float, float], latLng2: tuple[float, float
     return cross_product_z > 0
 
 
-def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection], ways: list[FetchRelationElement]) -> list[SortedBusEntry]:
+def interpolate_latLng(latLng1_rad: tuple[float, float], latLng2_rad: tuple[float, float], threshold: float) -> Generator[tuple[float, float], None, None]:
+    yield latLng1_rad
+
+    distance = haversine_distance(latLng1_rad, latLng2_rad, unit_radians=True)
+    num_interpolations = int(distance / threshold)
+
+    if num_interpolations == 0:
+        return
+
+    delta_lat_rad = (latLng2_rad[0] - latLng1_rad[0]) / (num_interpolations + 1)
+    delta_lng_rad = (latLng2_rad[1] - latLng1_rad[1]) / (num_interpolations + 1)
+
+    for i in range(1, num_interpolations + 1):
+        yield (latLng1_rad[0] + delta_lat_rad * i, latLng1_rad[1] + delta_lng_rad * i)
+
+
+def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection], ways: Iterable[FetchRelationElement]) -> list[SortedBusEntry]:
+    interpolate_threshold = 60  # meters
     latLng_rad_idx_way_map: dict[tuple, tuple[int, FetchRelationElement]] = {}
     tree_coordinates_rad = []
 
     for way in ways:
-        for idx, latLng in enumerate(way.latLngs):
-            latLng_rad = radians_tuple(latLng)
-            latLng_rad_idx_way_map[latLng_rad] = (idx, way)
-            tree_coordinates_rad.append(latLng_rad)
+        way_latLngs_rad = tuple(radians_tuple(latLng) for latLng in way.latLngs)
+        for idx, (current_latLng_rad, next_latLng_rad) in enumerate(zip_longest(way_latLngs_rad, way_latLngs_rad[1:], fillvalue=way_latLngs_rad[-1])):
+            for latLng_rad in interpolate_latLng(current_latLng_rad, next_latLng_rad, interpolate_threshold):
+                latLng_rad_idx_way_map[latLng_rad] = (idx, way)
+                tree_coordinates_rad.append(latLng_rad)
 
     tree = BallTree(tree_coordinates_rad, metric='haversine')
 

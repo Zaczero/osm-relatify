@@ -36,7 +36,7 @@ def _check_for_end_not_reached(route: FinalRoute, end_way: ElementId) -> FinalRo
 
 def _check_for_bus_stop_far_away(route: FinalRoute, bus_stop_collections: list[FetchRelationBusStopCollection]) -> FinalRouteWarning | None:
     threshold = 120  # meters
-    sorted_ways = [route_way.way for route_way in route.ways]
+    sorted_ways = (route_way.way for route_way in route.ways)
 
     for sorted_bus in sort_bus_on_path(bus_stop_collections, sorted_ways):
         if sorted_bus.distance_from_neighbor > threshold:
