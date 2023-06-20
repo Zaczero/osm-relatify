@@ -135,8 +135,8 @@ def find_start_stop_ways(ways: dict[ElementId, FetchRelationElement], id_map: di
         for endpoint_way_id in [all_way_ids[0], all_way_ids[-1]]:
             endpoint_way = ways[endpoint_way_id]
 
-            if not any(ways[connected_way_id].member
-                       for connected_way_id in endpoint_way.connectedTo):
+            if sum(1 for connected_way_id in endpoint_way.connectedTo
+                   if ways[connected_way_id].member) <= 1:
                 return endpoint_way_id
 
         return all_way_ids[len(all_way_ids) // 2]
