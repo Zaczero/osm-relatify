@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from models.element_id import ElementId
@@ -25,7 +25,7 @@ class WarningSeverity(Enum):
 class FinalRouteWarning:
     severity: WarningSeverity
     message: str
-    extra: tuple = None
+    extra: tuple = field(default_factory=tuple)
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
