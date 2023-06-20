@@ -138,6 +138,7 @@ def is_road(tags: dict[str, str]) -> bool:
         'driveway',
         'driveway2',
         'parking_aisle',
+        'alley',
         'emergency_access',
     }
 
