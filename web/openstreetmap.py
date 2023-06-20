@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Iterable
 
+import httpx
 import xmltodict
 from asyncache import cached
 from authlib.integrations.httpx_client import OAuth1Auth
@@ -24,22 +25,24 @@ class OpenStreetMap:
                  username: str = None, password: str = None,
                  oauth_token: str = None, oauth_token_secret: str = None):
         if oauth_token and oauth_token_secret:
-            auth = OAuth1Auth(
+            self.auth = OAuth1Auth(
                 client_id=CONSUMER_KEY,
                 client_secret=CONSUMER_SECRET,
                 token=oauth_token,
                 token_secret=oauth_token_secret,
                 force_include_body=True)
         elif username and password:
-            auth = (username, password)
+            self.auth = (username, password)
         else:
-            auth = None
+            self.auth = None
 
-        self.http = get_http_client('https://api.openstreetmap.org/api', auth=auth)
+    def _get_http_client(self) -> httpx.AsyncClient:
+        return get_http_client('https://api.openstreetmap.org/api', auth=self.auth)
 
     async def get_changeset_maxsize(self) -> int:
-        r = await self.http.get('/capabilities')
-        r.raise_for_status()
+        async with self._get_http_client() as http:
+            r = await http.get('/capabilities')
+            r.raise_for_status()
 
         caps = xmltodict.parse(r.text)
 
@@ -65,10 +68,10 @@ class OpenStreetMap:
 
     @cached(TTLCache(maxsize=1024, ttl=60))
     async def _get_elements(self, elements_type: str, element_ids: Iterable[str], json: bool) -> list[dict]:
-        r = await self.http.get(f'/0.6/{elements_type}{".json" if json else ""}', params={
-            elements_type: ','.join(map(str, element_ids))
-        })
-        r.raise_for_status()
+        async with self._get_http_client() as http:
+            r = await http.get(f'/0.6/{elements_type}{".json" if json else ""}', params={
+                elements_type: ','.join(map(str, element_ids))})
+            r.raise_for_status()
 
         if json:
             return r.json()['elements']
@@ -76,11 +79,12 @@ class OpenStreetMap:
             return ensure_list(xmltodict.parse(r.text)['osm'][elements_type[:-1]])
 
     async def get_authorized_user(self) -> dict | None:
-        if not self.http.auth:
+        if self.auth is None:
             return None
 
-        r = await self.http.get('/0.6/user/details.json')
-        r.raise_for_status()
+        async with self._get_http_client() as http:
+            r = await http.get('/0.6/user/details.json')
+            r.raise_for_status()
 
         return r.json()['user']
 
@@ -112,21 +116,21 @@ class OpenStreetMap:
 
         changeset = xmltodict.unparse(changeset_dict)
 
-        r = await self.http.put('/0.6/changeset/create', content=changeset, headers={
-            'Content-Type': 'text/xml; charset=utf-8',
-        }, follow_redirects=False)
-        r.raise_for_status()
-        changeset_id_raw = r.text
-        changeset_id = int(changeset_id_raw)
+        async with self._get_http_client() as http:
+            r = await http.put('/0.6/changeset/create', content=changeset, headers={
+                'Content-Type': 'text/xml; charset=utf-8'}, follow_redirects=False)
+            r.raise_for_status()
 
-        osm_change = osm_change.replace(CHANGESET_ID_PLACEHOLDER, changeset_id_raw)
+            changeset_id_raw = r.text
+            changeset_id = int(changeset_id_raw)
 
-        upload_resp = await self.http.post(f'/0.6/changeset/{changeset_id_raw}/upload', content=osm_change, headers={
-            'Content-Type': 'text/xml; charset=utf-8',
-        }, timeout=150)
+            osm_change = osm_change.replace(CHANGESET_ID_PLACEHOLDER, changeset_id_raw)
 
-        r = await self.http.put(f'/0.6/changeset/{changeset_id_raw}/close')
-        r.raise_for_status()
+            upload_resp = await http.post(f'/0.6/changeset/{changeset_id_raw}/upload', content=osm_change, headers={
+                'Content-Type': 'text/xml; charset=utf-8'}, timeout=150)
+
+            r = await http.put(f'/0.6/changeset/{changeset_id_raw}/close')
+            r.raise_for_status()
 
         if not upload_resp.is_success:
             return UploadResult(ok=False, error_code=upload_resp.status_code, error_message=upload_resp.text, changeset_id=changeset_id)

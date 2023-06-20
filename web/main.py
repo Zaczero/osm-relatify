@@ -2,7 +2,7 @@ import asyncio
 import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
-from typing import Optional, Sequence
+from typing import Optional
 
 from authlib.integrations.starlette_client import OAuth
 from cachetools import TTLCache

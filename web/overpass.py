@@ -5,6 +5,7 @@ from itertools import chain
 from math import radians
 from typing import Iterable, NamedTuple, Sequence
 
+import httpx
 import xmltodict
 from asyncache import cached
 from cachetools import TTLCache
@@ -565,16 +566,19 @@ def get_download_triggers(bbc: BoundingBoxCollection, cells: Sequence[Cell], way
     return dict(result)
 
 
+# TODO: check data freshness
 class Overpass:
     def __init__(self):
-        self.http = get_http_client(OVERPASS_API_INTERPRETER)
+        pass
 
-    # TODO: check data freshness
+    def _get_http_client(self) -> httpx.AsyncClient:
+        return get_http_client(OVERPASS_API_INTERPRETER)
 
     @cached(TTLCache(maxsize=1024, ttl=7200))  # 2 hours
     async def _query_relation_history_post(self, session: str, query: str, timeout: float) -> list[list[dict]]:
-        r = await self.http.post('', data={'data': query}, timeout=timeout * 2)
-        r.raise_for_status()
+        async with self._get_http_client() as http:
+            r = await http.post('', data={'data': query}, timeout=timeout * 2)
+            r.raise_for_status()
 
         elements: list[dict] = r.json()['elements']
         return split_by_count(elements)
@@ -613,8 +617,10 @@ class Overpass:
         if download_targets is None:
             timeout = 60
             query = build_bb_query(relation_id, timeout)
-            r = await self.http.post('', data={'data': query}, timeout=timeout * 2)
-            r.raise_for_status()
+
+            async with self._get_http_client() as http:
+                r = await http.post('', data={'data': query}, timeout=timeout * 2)
+                r.raise_for_status()
 
             elements: list[dict] = r.json()['elements']
 
@@ -711,8 +717,10 @@ class Overpass:
     async def query_parents(self, way_ids_set: frozenset[int]) -> QueryParentsResult:
         timeout = 60
         query = build_parents_query(way_ids_set, timeout)
-        r = await self.http.post('', data={'data': query}, timeout=timeout * 2)
-        r.raise_for_status()
+
+        async with self._get_http_client() as http:
+            r = await http.post('', data={'data': query}, timeout=timeout * 2)
+            r.raise_for_status()
 
         data: dict[str, list[dict]] = xmltodict.parse(
             r.text,
