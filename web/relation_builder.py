@@ -2,7 +2,7 @@ import asyncio
 from collections import defaultdict
 from dataclasses import replace
 from itertools import chain, zip_longest
-from typing import Generator, Iterable, NamedTuple
+from typing import Generator, Iterable, NamedTuple, Sequence
 
 import xmltodict
 from numba import njit
@@ -39,20 +39,20 @@ def is_right_hand_side(latLng1: tuple[float, float], latLng2: tuple[float, float
     return cross_product_z > 0
 
 
-def interpolate_latLng(latLng1_rad: tuple[float, float], latLng2_rad: tuple[float, float], threshold: float) -> Generator[tuple[float, float], None, None]:
-    yield latLng1_rad
-
+@njit(fastmath=True)
+def interpolate_latLng(latLng1_rad: tuple[float, float], latLng2_rad: tuple[float, float], threshold: float) -> list[tuple[float, float]]:
     distance = haversine_distance(latLng1_rad, latLng2_rad, unit_radians=True)
-    num_interpolations = int(distance / threshold)
+    result_size = int(distance / threshold) + 1
+    result = [latLng1_rad]
 
-    if num_interpolations == 0:
-        return
+    if result_size > 1:
+        delta_lat_rad = (latLng2_rad[0] - latLng1_rad[0]) / result_size
+        delta_lng_rad = (latLng2_rad[1] - latLng1_rad[1]) / result_size
 
-    delta_lat_rad = (latLng2_rad[0] - latLng1_rad[0]) / (num_interpolations + 1)
-    delta_lng_rad = (latLng2_rad[1] - latLng1_rad[1]) / (num_interpolations + 1)
+        for i in range(1, result_size):
+            result.append((latLng1_rad[0] + delta_lat_rad * i, latLng1_rad[1] + delta_lng_rad * i))
 
-    for i in range(1, num_interpolations + 1):
-        yield (latLng1_rad[0] + delta_lat_rad * i, latLng1_rad[1] + delta_lng_rad * i)
+    return result
 
 
 def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection], ways: Iterable[FetchRelationElement]) -> list[SortedBusEntry]:
