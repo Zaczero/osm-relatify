@@ -261,8 +261,8 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
             split_ways_in_order.sort(key=lambda x: x[0])
 
             # determine the order of the split ways
-            if way_index_relative_to_first > 0:
-                before_way_id = int(relation['member'][way_index - 1]['@ref'])
+            if way_index_relative_to_first > 0 and (before_entry := relation['member'][way_index - 1]) and before_entry['@type'] == 'way':
+                before_way_id = int(before_entry['@ref'])
                 before_way_id = unique_native_id_map.get(before_way_id, before_way_id)
                 before_way = parents.ways_map[before_way_id]
                 before_way['nd'] = before_way.get('nd', [])
@@ -273,8 +273,8 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
                             split_ways_in_order.reverse()
                             break
 
-            elif way_index_relative_to_first == 0 and way_index + 1 < len(relation['member']):
-                after_way_id = int(relation['member'][way_index + 1]['@ref'])
+            elif way_index_relative_to_first == 0 and way_index + 1 < len(relation['member']) and (after_entry := relation['member'][way_index + 1]) and after_entry['@type'] == 'way':
+                after_way_id = int(after_entry['@ref'])
                 after_way_id = unique_native_id_map.get(after_way_id, after_way_id)
                 after_way = parents.ways_map[after_way_id]
                 after_way['nd'] = after_way.get('nd', [])
