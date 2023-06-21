@@ -284,7 +284,7 @@ async def post_calc_bus_route(ws: WebSocket, user: dict = Depends(require_user_d
             body = deflate_compress(body)
             await ws.send_bytes(body)
     finally:
-        if ws.application_state == WebSocketState.CONNECTED:
+        if ws.client_state == WebSocketState.CONNECTED and ws.application_state == WebSocketState.CONNECTED:
             await ws.close(1011)
 
 
