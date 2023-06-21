@@ -207,6 +207,18 @@ const addWay = way => {
     addGroupToLayers(way.id, group)
 }
 
+export const removeMembersList = wayIds => {
+    for (const wayId of wayIds) {
+        if (wayId === startWay.id || wayId === stopWay.id)
+            continue
+
+        waysData[wayId].member = false
+        removeGroupFromLayers(wayId)
+    }
+
+    onWaysDataChanged()
+}
+
 const addGroupToLayers = (id, group) => {
     if (idGroupMap.has(id))
         return

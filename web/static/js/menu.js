@@ -4,7 +4,7 @@ import { map } from './map.js'
 import { showMessage } from './messageBox.js'
 import { createElementFromHTML, deflateCompress } from './utils.js'
 import { processRelationEndpointData } from './waysEndpoint.js'
-import { processRelationWaysData } from './waysLayer.js'
+import { processRelationWaysData, removeMembersList, waysData } from './waysLayer.js'
 import { routeData } from './waysRoute.js'
 
 const busAnimationElement = document.getElementById('bus-animation')
@@ -145,12 +145,24 @@ export const processRouteWarnings = data => {
             const child = createElementFromHTML(`
             <div class="warning warning-${severity_text}">
                 <div class="warning-message">${warning.message}</div>
-                <div>
-                    <button class="btn btn-sm btn-primary ms-2">Show me</button>
+                <div class="btn-group-vertical ms-2">
+                    <button class="btn primary btn-primary">Show me</button>
+                    <button class="btn secondary btn-outline-danger">Deselect all</button>
                 </div>
             </div>`)
+
+            child.querySelector('button.primary').onclick = () => {
+                // show me
+                const way = waysData[warning.extra[0]]
+                map.setView(way.midpoint, 19)
+            }
+
+            child.querySelector('button.secondary').onclick = () => {
+                // deselect all
+                removeMembersList(warning.extra)
+            }
+
             editWarnings.appendChild(child)
-            child.querySelector('button').onclick = () => map.setView(warning.extra[0], 19)
         }
         else {
             editWarnings.appendChild(createElementFromHTML(`
@@ -159,6 +171,8 @@ export const processRouteWarnings = data => {
             </div>`))
         }
     }
+
+    editSubmitBtn.classList.toggle('mt-2', data.warnings.length > 0)
 
     if (highestSeverityLevel == 0)
         editSubmitBtn.classList.remove('d-none')

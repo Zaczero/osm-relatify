@@ -19,7 +19,7 @@ def _check_for_unused_ways(route: FinalRoute, ways: dict[ElementId, FetchRelatio
         return FinalRouteWarning(
             severity=WarningSeverity.HIGH,
             message='Some ways are not used',
-            extra=tuple(map(lambda way_id: ways[way_id].midpoint, unused_way_ids)))
+            extra=tuple(unused_way_ids))
 
     return None
 

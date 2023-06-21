@@ -152,6 +152,7 @@ async def post_query(model: PostQueryModel) -> FetchRelation:
         try:
             relation = await get_task
         except HTTPStatusError as e:
+            query_task.cancel()
             if e.response.status_code == status.HTTP_404_NOT_FOUND:
                 raise HTTPException(status.HTTP_404_NOT_FOUND, 'Relation not found')
             raise
@@ -161,6 +162,7 @@ async def post_query(model: PostQueryModel) -> FetchRelation:
         if relation_tags.get('type') != 'route' or \
                 relation_tags.get('route') != 'bus' or \
                 relation_tags.get('public_transport:version') != '2':
+            query_task.cancel()
             raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Relation must be a PTv2 bus route')
 
         bounds, download_hist, download_triggers, ways, id_map, bus_stop_collections = await query_task

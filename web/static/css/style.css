@@ -86,7 +86,7 @@
 
 .warning {
   background: #f2f2f2;
-  padding: 6px 10px;
+  padding: 6px 6px 6px 10px;
   border: 1px dashed transparent;
   border-radius: 5px;
   display: flex;
@@ -123,6 +123,16 @@
 
 .warning-none::before {
   content: unset;
+}
+
+.warning .btn.primary {
+  font-size: 0.8em;
+  padding: 0.2em 0.8em;
+}
+
+.warning .btn.secondary {
+  font-size: 0.7em;
+  padding: 0.08em 0.8em;
 }
 
 .navbar {
