@@ -1,7 +1,7 @@
 import { clearAntPath, processRouteAntPath } from './antPathLayer.js'
 import { busStopData } from './busStopsLayer.js'
 import { processRouteStops, processRouteWarnings, relationId } from './menu.js'
-import { deflateCompress } from './utils.js'
+import { deflateCompress, deflateDecompress } from './utils.js'
 import { startWay, stopWay } from './waysEndpoint.js'
 import { waysData } from './waysLayer.js'
 
@@ -46,55 +46,74 @@ export function requestCalcBusRoute() {
     calcBusRoute(startWay.id, stopWay.id, ways, busStops)
 }
 
-let calcBusRouteAbortController = null
+const minReconnectInterval = 200
+const maxReconnectInterval = 2000
+const reconnectIntervalMultiplier = 2
+let reconnectInterval = minReconnectInterval
 
-const calcBusRoute = async (startWay, stopWay, ways, busStops) => {
-    if (calcBusRouteAbortController)
-        calcBusRouteAbortController.abort()
+let calcBusRouteScheduledArgs = null
+let awaitingResponse = false
 
-    calcBusRouteAbortController = new AbortController()
+const onopen = async () => {
+    if (ws.readyState === WebSocket.OPEN)
+        reconnectInterval = minReconnectInterval
 
-    fetch('/calc_bus_route', {
-        method: 'POST',
-        headers: {
-            'Content-Encoding': 'deflate',
-            'Content-Type': 'application/json'
-        },
-        body: await deflateCompress({
-            relationId: relationId,
-            startWay: startWay,
-            stopWay: stopWay,
-            ways: ways,
-            busStops: busStops
-        }),
-        signal: calcBusRouteAbortController.signal
+    if (!calcBusRouteScheduledArgs || awaitingResponse)
+        return
+
+    const [startWay, stopWay, ways, busStops] = calcBusRouteScheduledArgs
+    calcBusRouteScheduledArgs = null
+    awaitingResponse = true
+
+    const body = await deflateCompress({
+        relationId: relationId,
+        startWay: startWay,
+        stopWay: stopWay,
+        ways: ways,
+        busStops: busStops
     })
-        .then(resp => {
-            if (!resp.ok) {
-                console.error(resp)
-                throw new Error('HTTP error')
-            }
 
-            return resp.json()
-        })
-        .then(data => {
-            processRouteData(data)
-            processRouteAntPath(data)
-            processRouteWarnings(data)
-            processRouteStops(data)
-        })
-        .catch(error => {
-            if (error.name !== 'AbortError') {
-                console.error(error)
-                clearAntPath()
-                processRouteWarnings({
-                    warnings: [{
-                        severity: ['HIGH', 999],
-                        message: 'Failed to calculate bus route'
-                    }]
-                })
-            }
-        })
+    ws.send(body)
+}
+
+const onmessage = async e => {
+    const data = await deflateDecompress(e.data)
+
+    processRouteData(data)
+    processRouteAntPath(data)
+    processRouteWarnings(data)
+    processRouteStops(data)
+
+    awaitingResponse = false
+    await onopen()
+}
+
+const onclose = async e => {
+    console.error(e)
+    console.log(`Reconnecting in ${reconnectInterval}ms`)
+    awaitingResponse = false
+
+    setTimeout(() => {
+        ws = new WebSocket(ws.url)
+        ws.binaryType = 'arraybuffer'
+        ws.onopen = onopen
+        ws.onmessage = onmessage
+        ws.onclose = onclose
+    }, reconnectInterval)
+
+    reconnectInterval = Math.min(reconnectInterval * reconnectIntervalMultiplier, maxReconnectInterval)
+}
+
+let ws = new WebSocket(`${document.location.protocol === 'https:' ? 'wss' : 'ws'}://${document.location.host}/ws/calc_bus_route`)
+ws.binaryType = 'arraybuffer'
+ws.onopen = onopen
+ws.onmessage = onmessage
+ws.onclose = onclose
+
+const calcBusRoute = async (...args) => {
+    calcBusRouteScheduledArgs = args
+    if (ws.readyState === WebSocket.OPEN)
+        await onopen()
 }
 
 function processRouteData(route) {

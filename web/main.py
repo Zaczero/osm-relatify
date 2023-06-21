@@ -1,13 +1,15 @@
 import asyncio
 import os
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Optional
 
+import orjson
 from authlib.integrations.starlette_client import OAuth
 from cachetools import TTLCache
 from dacite import Config, from_dict
-from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi import (FastAPI, HTTPException, Request, Response, WebSocket,
+                     status)
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -15,8 +17,10 @@ from httpx import HTTPStatusError
 from itsdangerous import Serializer
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.websockets import WebSocketState
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from compression import deflate_compress, deflate_decompress
 from config import (CALC_ROUTE_MAX_PROCESSES, CALC_ROUTE_N_PROCESSES,
                     CREATED_BY, SECRET, WEBSITE)
 from deflate_middleware import DeflateRoute
@@ -186,71 +190,87 @@ async def post_query(model: PostQueryModel) -> FetchRelation:
         busStops=bus_stop_collections)
 
 
-class PostCalcBusRouteModel(BaseModel):
+@dataclass(frozen=True, kw_only=True, slots=True)
+class PostCalcBusRouteModel:
     relationId: int
     startWay: ElementId
     stopWay: ElementId
-    ways: dict[ElementId, dict]
-    busStops: list[dict]
+    ways: dict[ElementId | str, FetchRelationElement]
+    busStops: list[FetchRelationBusStopCollection]
 
 
-@app.post('/calc_bus_route')
-async def post_calc_bus_route(model: PostCalcBusRouteModel) -> FinalRoute:
-    # TODO: caching?
-
-    assert model.startWay in model.ways, 'Start way not in ways'
-    assert model.stopWay in model.ways, 'Stop way not in ways'
-
-    ways = {
-        ElementId(way_id): from_dict(FetchRelationElement, way, Config(cast=[ElementId, tuple], strict=True))
-        for way_id, way in model.ways.items()}
-
-    assert all(way_id == way.id for way_id, way in ways.items()), 'Way ids must match'
-
-    ways_members = {
-        way_id: way
-        for way_id, way in ways.items()
-        if way.member}
-
-    ways_non_members = {
-        way_id: way
-        for way_id, way in ways.items()
-        if not way.member}
-
-    assert ways_members, 'No ways are members of the relation'
-
-    bus_stop_collections = [
-        from_dict(FetchRelationBusStopCollection, bus_stop,
-                  Config(cast=[ElementId, tuple, PublicTransport], strict=True))
-        for bus_stop in model.busStops]
-
-    assert all(collection.platform.member for collection in bus_stop_collections if collection.platform), 'All bus platforms must be members of the relation'
-    assert all(collection.stop.member for collection in bus_stop_collections if collection.stop), 'All bus stops must be members of the relation'
+@app.websocket('/ws/calc_bus_route')
+async def post_calc_bus_route(ws: WebSocket):
+    await ws.accept()
 
     try:
-        async with asyncio.TaskGroup() as tg:
-            get_task = tg.create_task(openstreetmap.get_relation(model.relationId))
-            route_task = tg.create_task(asyncio.wait_for(
-                calc_bus_route(
-                    ways_members,
-                    model.startWay,
-                    model.stopWay,
-                    bus_stop_collections,
-                    process_executor,
-                    n_processes=CALC_ROUTE_N_PROCESSES),
-                timeout=3))
+        while True:
+            body = await ws.receive_bytes()
+            body = deflate_decompress(body)
+            json = orjson.loads(body)
+            model = from_dict(PostCalcBusRouteModel, json,
+                              Config(cast=[ElementId, tuple, PublicTransport], strict=True))
 
-    except asyncio.TimeoutError:
-        raise HTTPException(status.HTTP_408_REQUEST_TIMEOUT, 'Route calculation timed out')
+            assert model.startWay in model.ways, 'Start way not in ways'
+            assert model.stopWay in model.ways, 'Stop way not in ways'
+            assert all(way_id == way.id for way_id, way in model.ways.items()), 'Way ids must match'
 
-    relation = get_task.result()
-    relation_members = get_relation_members(relation)
+            ways_members = {
+                way_id: way
+                for way_id, way in model.ways.items()
+                if way.member}
 
-    route = route_task.result()
-    route = replace(route, extraWaysToUpdate=tuple(ways_non_members.values()))
-    route = sort_and_upgrade_members(route, relation_members)
+            ways_non_members = {
+                way_id: way
+                for way_id, way in model.ways.items()
+                if not way.member}
 
-    return check_for_issues(route, ways_members, model.startWay, model.stopWay, bus_stop_collections, relation_members)
+            assert ways_members, 'No ways are members of the relation'
+
+            assert all(collection.platform.member
+                       for collection in model.busStops
+                       if collection.platform), 'All bus platforms must be members of the relation'
+            assert all(collection.stop.member
+                       for collection in model.busStops
+                       if collection.stop), 'All bus stops must be members of the relation'
+
+            try:
+                async with asyncio.TaskGroup() as tg:
+                    get_task = tg.create_task(openstreetmap.get_relation(model.relationId))
+                    route_task = tg.create_task(asyncio.wait_for(
+                        calc_bus_route(
+                            ways_members,
+                            model.startWay,
+                            model.stopWay,
+                            model.busStops,
+                            process_executor,
+                            n_processes=CALC_ROUTE_N_PROCESSES),
+                        timeout=3))
+
+            except asyncio.TimeoutError:
+                raise HTTPException(status.HTTP_408_REQUEST_TIMEOUT, 'Route calculation timed out')
+
+            relation = get_task.result()
+            relation_members = get_relation_members(relation)
+
+            route = route_task.result()
+            route = replace(route, extraWaysToUpdate=tuple(ways_non_members.values()))
+            route = sort_and_upgrade_members(route, relation_members)
+
+            final_route = check_for_issues(
+                route=route,
+                ways=ways_members,
+                start_way=model.startWay,
+                end_way=model.stopWay,
+                bus_stop_collections=model.busStops,
+                relation_members=relation_members)
+
+            body = orjson.dumps(final_route, option=orjson.OPT_NON_STR_KEYS)
+            body = deflate_compress(body)
+            await ws.send_bytes(body)
+    finally:
+        if ws.application_state == WebSocketState.CONNECTED:
+            await ws.close(1011)
 
 
 class PostDownloadOsmChangeModel(BaseModel):

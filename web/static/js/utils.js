@@ -64,3 +64,39 @@ export const deflateCompress = async data => {
 
     return concatenatedChunks
 }
+
+
+export const deflateDecompress = async data => {
+    const decompressionStream = new DecompressionStream('deflate-raw')
+
+    const writer = decompressionStream.writable.getWriter()
+    writer.write(data)
+    writer.close()
+
+    const reader = decompressionStream.readable.getReader()
+
+    let chunks = []
+    let totalLength = 0
+
+    while (true) {
+        const { done, value } = await reader.read()
+
+        if (done)
+            break
+
+        chunks.push(value)
+        totalLength += value.length
+    }
+
+    let concatenatedChunks = new Uint8Array(totalLength)
+    let position = 0
+
+    for (let chunk of chunks) {
+        concatenatedChunks.set(chunk, position)
+        position += chunk.length
+    }
+
+    const decoder = new TextDecoder()
+    const json = decoder.decode(concatenatedChunks)
+    return JSON.parse(json)
+}

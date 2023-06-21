@@ -1,8 +1,9 @@
-import zlib
 from typing import Callable
 
 from fastapi import Request, Response
 from fastapi.routing import APIRoute
+
+from compression import deflate_decompress
 
 
 class DeflateRequest(Request):
@@ -11,7 +12,7 @@ class DeflateRequest(Request):
             body = await super().body()
 
             if self.headers.get('Content-Encoding') == 'deflate':
-                body = zlib.decompress(body, -zlib.MAX_WBITS)
+                body = deflate_decompress(body)
 
             self._body = body
 
