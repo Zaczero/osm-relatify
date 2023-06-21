@@ -8,8 +8,8 @@ import orjson
 from authlib.integrations.starlette_client import OAuth
 from cachetools import TTLCache
 from dacite import Config, from_dict
-from fastapi import (FastAPI, HTTPException, Request, Response, WebSocket,
-                     status)
+from fastapi import (Depends, FastAPI, HTTPException, Request, Response,
+                     WebSocket, status)
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -47,8 +47,7 @@ oauth.register(
     client_secret=os.getenv('CONSUMER_SECRET'),
     request_token_url='https://www.openstreetmap.org/oauth/request_token',
     access_token_url='https://www.openstreetmap.org/oauth/access_token',
-    authorize_url='https://www.openstreetmap.org/oauth/authorize'
-)
+    authorize_url='https://www.openstreetmap.org/oauth/authorize')
 
 app = FastAPI(default_response_class=ORJSONResponse)
 app.add_middleware(SessionMiddleware, secret_key=SECRET)
@@ -66,12 +65,19 @@ overpass = Overpass()
 
 
 @retry(wait=wait_exponential(), stop=stop_after_attempt(3))
-async def fetch_user_details(request: Request) -> Optional[dict]:
-    if 'token' not in request.cookies:
+async def fetch_user_details(request: Request = None, websocket: WebSocket = None) -> Optional[dict]:
+    if request is not None:
+        cookies = request.cookies
+    elif websocket is not None:
+        cookies = websocket.cookies
+    else:
+        raise ValueError('Either request or websocket must be provided')
+
+    if 'token' not in cookies:
         return None
 
     try:
-        token = secret.loads(request.cookies['token'])
+        token = secret.loads(cookies['token'])
     except Exception:
         return None
 
@@ -97,10 +103,17 @@ async def fetch_user_details(request: Request) -> Optional[dict]:
         return user
 
 
+async def require_user_details(user=Depends(fetch_user_details)) -> dict:
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    return user
+
+
 @app.get('/')
 @app.post('/')
-async def index(request: Request):
-    if user := await fetch_user_details(request):
+async def index(request: Request, user=Depends(fetch_user_details)):
+    if user is not None:
         return templates.TemplateResponse('authorized.jinja2', {'request': request, 'user': user})
     else:
         return templates.TemplateResponse('index.jinja2', {'request': request})
@@ -139,7 +152,8 @@ class PostQueryModel(BaseModel):
 
 
 @app.post('/query')
-async def post_query(model: PostQueryModel) -> FetchRelation:
+async def post_query(model: PostQueryModel, user: dict = Depends(require_user_details)) -> FetchRelation:
+    print(f'🔍 Querying relation ({model.relationId})')
     assert (model.downloadHistory is None) == (model.downloadTargets is None)
 
     if model.downloadHistory is not None:
@@ -200,7 +214,7 @@ class PostCalcBusRouteModel:
 
 
 @app.websocket('/ws/calc_bus_route')
-async def post_calc_bus_route(ws: WebSocket):
+async def post_calc_bus_route(ws: WebSocket, user: dict = Depends(require_user_details)):
     await ws.accept()
 
     try:
@@ -211,6 +225,7 @@ async def post_calc_bus_route(ws: WebSocket):
             model = from_dict(PostCalcBusRouteModel, json,
                               Config(cast=[ElementId, tuple, PublicTransport], strict=True))
 
+            print(f'🛣️ Calculating bus route ({model.relationId})')
             assert model.startWay in model.ways, 'Start way not in ways'
             assert model.stopWay in model.ways, 'Stop way not in ways'
             assert all(way_id == way.id for way_id, way in model.ways.items()), 'Way ids must match'
@@ -279,7 +294,9 @@ class PostDownloadOsmChangeModel(BaseModel):
 
 
 @app.post('/download_osm_change')
-async def post_download_osm_change(model: PostDownloadOsmChangeModel):
+async def post_download_osm_change(model: PostDownloadOsmChangeModel, user=Depends(require_user_details)):
+    print(f'💾 Downloading OSM change ({model.relationId})')
+
     route = from_dict(FinalRoute, model.route,
                       Config(cast=[ElementId, tuple, PublicTransport, WarningSeverity], strict=True))
 
@@ -289,7 +306,9 @@ async def post_download_osm_change(model: PostDownloadOsmChangeModel):
 
 
 @app.post('/upload_osm')
-async def post_upload_osm(request: Request, model: PostDownloadOsmChangeModel) -> UploadResult:
+async def post_upload_osm(request: Request, model: PostDownloadOsmChangeModel, user=Depends(require_user_details)) -> UploadResult:
+    print(f'🌐 Uploading OSM change ({model.relationId})')
+
     token = secret.loads(request.cookies['token'])
     oauth_token = token['oauth_token']
     oauth_token_secret = token['oauth_token_secret']
@@ -309,5 +328,10 @@ async def post_upload_osm(request: Request, model: PostDownloadOsmChangeModel) -
         'created_by': CREATED_BY,
         'website': WEBSITE,
     })
+
+    if upload_result.ok:
+        print(f'✅ Changeset upload success: #{upload_result.changeset_id}')
+    else:
+        print(f'🚩 Changeset upload failure: {upload_result}')
 
     return upload_result
