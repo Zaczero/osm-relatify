@@ -27,14 +27,14 @@
 
   <link rel="icon" type="image/webp" sizes="512x512" href="/static/img/icon.webp">
 
-  <link rel=" stylesheet" href="/static/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="/static/css/bootstrap.min.css" />
   <link rel="stylesheet" href="/static/leaflet/leaflet.css" />
   <link rel="stylesheet" href="/static/css/style.css" />
+
+  <script src="/static/js/bootstrap.bundle.min.js"></script>
 </head>
 
 <body>
-
-  {% block body %}{% endblock %}
 
   <div id="bus-animation" class="d-none">
     <div class="animation-container">
@@ -49,7 +49,7 @@
 
   {{ message_modal.render() }}
 
-  <script src="/static/js/bootstrap.bundle.min.js"></script>
+  {% block body %}{% endblock %}
 
 </body>
 

@@ -51,6 +51,12 @@ COPY --chown=1000:1000 models ./models/
 COPY --chown=1000:1000 static ./static/
 COPY --chown=1000:1000 templates ./templates/
 
+RUN HASH=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c8 ; echo '') && \
+    esbuild static/js/menu.js --bundle --minify --sourcemap --charset=utf8 --outfile=static/js/menu.$HASH.js && \
+    find templates -type f -exec sed -i 's|src="/static/js/menu.js" type="module"|src="/static/js/menu.'$HASH'.js"|g' {} \; && \
+    esbuild static/css/style.css --bundle --minify --sourcemap --charset=utf8 --outfile=static/css/style.$HASH.css && \
+    find templates -type f -exec sed -i 's|href="/static/css/style.css"|href="/static/css/style.'$HASH'.css"|g' {} \;
+
 RUN python -m compileall .
 
 ENV PYTHONUNBUFFERED=1

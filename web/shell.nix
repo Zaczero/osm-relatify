@@ -5,6 +5,7 @@ pkgs.mkShell {
     gnumake
     python311
     pipenv
+    esbuild
   ];
 
   shellHook = with pkgs; ''
