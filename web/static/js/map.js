@@ -28,11 +28,24 @@ export function getLocationHash() {
     return `map=${zoom}/${center.lat.toFixed(6)}/${center.lng.toFixed(6)}`
 }
 
+// josm-like url hash: left=XXX&bottom=YYY&right=ZZZ&top=WWW
+export function getJosmLocationHash() {
+    const bounds = map.getBounds()
+    return `left=${bounds.getWest()}&bottom=${bounds.getSouth()}&right=${bounds.getEast()}&top=${bounds.getNorth()}`
+}
+
 export const openInOpenStreetMap = path => {
     if (!path)
         path = ''
 
     window.open(`https://www.openstreetmap.org/${path}#${getLocationHash()}`, '_blank')
+}
+
+export const openInJosm = path => {
+    if (!path)
+        path = ''
+
+    fetch(`http://localhost:8111/load_and_zoom?${getJosmLocationHash()}&select=${path}`)
 }
 
 function updateUrl() {
