@@ -9,7 +9,7 @@ from authlib.integrations.starlette_client import OAuth
 from cachetools import TTLCache
 from dacite import Config, from_dict
 from fastapi import (Depends, FastAPI, HTTPException, Request, Response,
-                     WebSocket, status)
+                     WebSocket, WebSocketDisconnect, status)
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -283,6 +283,8 @@ async def post_calc_bus_route(ws: WebSocket, user: dict = Depends(require_user_d
             body = orjson.dumps(final_route, option=orjson.OPT_NON_STR_KEYS)
             body = deflate_compress(body)
             await ws.send_bytes(body)
+    except WebSocketDisconnect:
+        pass
     finally:
         if ws.client_state == WebSocketState.CONNECTED and ws.application_state == WebSocketState.CONNECTED:
             await ws.close(1011)
