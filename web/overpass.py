@@ -6,6 +6,7 @@ from math import radians
 from typing import Iterable, NamedTuple, Sequence
 
 import httpx
+import numpy as np
 import xmltodict
 from asyncache import cached
 from cachetools import TTLCache
@@ -22,7 +23,7 @@ from models.element_id import ElementId
 from models.fetch_relation import (FetchRelationBusStop,
                                    FetchRelationBusStopCollection,
                                    FetchRelationElement, PublicTransport)
-from utils import get_http_client, radians_tuple
+from utils import get_http_client, haversine_distance, radians_tuple
 from xmltodict_postprocessor import postprocessor
 
 # TODO: right hand side detection by querying roundabouts, and first/last bus stop
@@ -452,25 +453,34 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
 
             if platforms_explicit:
                 if len(stops) >= 2:
-                    stops_tree = BallTree(tuple(radians_tuple(stop.latLng) for stop in stops), metric='haversine')
-
-                    query_distances, query_indices = stops_tree.query(
-                        tuple(radians_tuple(best_platform.latLng) for best_platform in best_platforms),
-                        k=min(len(stops), len(best_platforms)),
-                        return_distance=True,
-                        sort_results=True)
-
+                    # find the closest stop to each platform
                     if len(stops) < len(best_platforms):
+                        stops_tree = BallTree(tuple(radians_tuple(stop.latLng) for stop in stops), metric='haversine')
+                        query_indices = stops_tree.query(
+                            tuple(radians_tuple(best_platform.latLng) for best_platform in best_platforms),
+                            k=1,
+                            return_distance=False,
+                            sort_results=False)
+
                         query_stops = (stops[i] for i in query_indices[:, 0])
+
+                    # minimize the total distance between each platform and stop
                     else:
+                        distance_matrix = np.zeros((len(best_platforms), len(stops)))
+
+                        # compute the haversine distance between each platform and stop
+                        for i, platform in enumerate(best_platforms):
+                            for j, stop in enumerate(stops):
+                                distance_matrix[i, j] = haversine_distance(platform.latLng, stop.latLng)
+
                         # use the Hungarian algorithm to find the optimal assignment
-                        row_ind, col_ind = linear_sum_assignment(query_distances)
+                        row_ind, col_ind = linear_sum_assignment(distance_matrix)
 
                         # ensure the assignments are sorted by platform indices
                         assignments = sorted(zip(row_ind, col_ind))
 
                         # get the assigned stop for each platform
-                        query_stops = (stops[query_indices[i][j]] for i, j in assignments)
+                        query_stops = (stops[j] for _, j in assignments)
 
                 elif len(stops) == 1:
                     query_stops = repeat(stops[0], len(best_platforms))
