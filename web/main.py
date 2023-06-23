@@ -2,6 +2,7 @@ import asyncio
 import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, replace
+from pprint import pprint
 from typing import Optional
 
 import orjson
@@ -302,7 +303,8 @@ async def post_download_osm_change(model: PostDownloadOsmChangeModel, user=Depen
     route = from_dict(FinalRoute, model.route,
                       Config(cast=[ElementId, tuple, PublicTransport, WarningSeverity], strict=True))
 
-    osm_change = await build_osm_change(model.relationId, route, include_changeset_id=False, overpass=overpass, osm=openstreetmap)
+    with print_run_time('Building OSM change'):
+        osm_change = await build_osm_change(model.relationId, route, include_changeset_id=False, overpass=overpass, osm=openstreetmap)
 
     return Response(content=osm_change, media_type='text/xml; charset=utf-8')
 
@@ -311,6 +313,12 @@ async def post_download_osm_change(model: PostDownloadOsmChangeModel, user=Depen
 async def post_upload_osm(request: Request, model: PostDownloadOsmChangeModel, user=Depends(require_user_details)) -> UploadResult:
     print(f'🌐 Uploading OSM change ({model.relationId})')
 
+    route = from_dict(FinalRoute, model.route,
+                      Config(cast=[ElementId, tuple, PublicTransport, WarningSeverity], strict=True))
+
+    with print_run_time('Building OSM change'):
+        osm_change = await build_osm_change(model.relationId, route, include_changeset_id=True, overpass=overpass, osm=openstreetmap)
+
     token = secret.loads(request.cookies['token'])
     oauth_token = token['oauth_token']
     oauth_token_secret = token['oauth_token_secret']
@@ -318,11 +326,6 @@ async def post_upload_osm(request: Request, model: PostDownloadOsmChangeModel, u
     openstreetmap_auth = OpenStreetMap(oauth_token=oauth_token, oauth_token_secret=oauth_token_secret)
     openstreetmap_user = await openstreetmap_auth.get_authorized_user()
     user_edits = openstreetmap_user['changesets']['count']
-
-    route = from_dict(FinalRoute, model.route,
-                      Config(cast=[ElementId, tuple, PublicTransport, WarningSeverity], strict=True))
-
-    osm_change = await build_osm_change(model.relationId, route, include_changeset_id=True, overpass=overpass, osm=openstreetmap)
 
     upload_result = await openstreetmap_auth.upload_osm_change(osm_change, {
         'changesets_count': user_edits + 1,

@@ -727,7 +727,7 @@ class Overpass:
 
         return global_bb, download_hist, download_triggers, ways, id_map, bus_stop_collections
 
-    @cached(TTLCache(maxsize=512, ttl=90))
+    @cached(TTLCache(maxsize=128, ttl=60))
     async def query_parents(self, way_ids_set: frozenset[int]) -> QueryParentsResult:
         timeout = 60
         query = build_parents_query(way_ids_set, timeout)
@@ -755,14 +755,12 @@ class Overpass:
                 if member['@type'] == 'way' and member['@ref'] in way_ids_set:
                     id_relations_map[member['@ref']].append(relation)
 
-        # deduplicate relations by id
+        # unique relations
         for way_id, relations in id_relations_map.items():
             id_relations_map[way_id] = list({r['@id']: r for r in relations}.values())
 
         ways = data.get('way', [])
-        ways_map = {
-            w['@id']: w
-            for w in ways}
+        ways_map = {w['@id']: w for w in ways}
 
         return QueryParentsResult(
             id_relations_map=id_relations_map,

@@ -241,6 +241,9 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
     for way_id in split_ways:
         element_ids = native_id_element_ids_map[way_id]
 
+        # assert unique relations
+        assert len(parents.id_relations_map[way_id]) == len(set(r['@id'] for r in parents.id_relations_map[way_id]))
+
         # iterate over each related relation
         for relation in parents.id_relations_map[way_id]:
             if relation['@id'] == ignore_relation_id:
@@ -248,19 +251,22 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
 
             result[relation['@id']] = relation
 
-            # reversed because we insert after way_index which breaks enumeration
-            for way_index, member in reversed(list(enumerate(relation['member']))):
-                if member['@ref'] != way_id:
+            member_index = 0
+            while member_index < len(relation['member']):
+                member = relation['member'][member_index]
+
+                if not (member['@ref'] == way_id and member['@type'] == 'way'):
+                    member_index += 1
                     continue
 
-                way_role = relation['member'][way_index]['@role']
+                way_role = relation['member'][member_index]['@role']
 
                 split_ways_in_order = list(sorted(element_ids.items(), key=lambda x: x[0]))
                 first_way_nd = id_way_map[split_ways_in_order[0][1]].nodes[0]
                 last_way_nd = id_way_map[split_ways_in_order[-1][1]].nodes[-1]
                 is_reversed = False
 
-                if way_index > 0 and (before_entry := relation['member'][way_index - 1]) and before_entry['@type'] == 'way':
+                if member_index > 0 and (before_entry := relation['member'][member_index - 1]) and before_entry['@type'] == 'way':
                     before_way_id = before_entry['@ref']
                     before_way_id = unique_native_id_map.get(before_way_id, before_way_id)
                     before_way = parents.ways_map[before_way_id]
@@ -271,7 +277,7 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
                 else:
                     before_way = None
 
-                if way_index + 1 < len(relation['member']) and (after_entry := relation['member'][way_index + 1]) and after_entry['@type'] == 'way':
+                if member_index + 1 < len(relation['member']) and (after_entry := relation['member'][member_index + 1]) and after_entry['@type'] == 'way':
                     after_way_id = after_entry['@ref']
                     after_way_id = unique_native_id_map.get(after_way_id, after_way_id)
                     after_way = parents.ways_map[after_way_id]
@@ -298,11 +304,11 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
                             is_reversed = True
 
                 # remove the original way from the relation member list
-                relation['member'].pop(way_index)
+                relation['member'].pop(member_index)
 
                 # replace the original way in the relation member list with the split ways
-                i = 0
                 safe_to_insert = before_way is None
+                insert_count = 0
 
                 for _, element_id in islice(cycle(split_ways_in_order), len(split_ways_in_order) * 2):
                     element = id_way_map[element_id]
@@ -318,16 +324,17 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
                     if not safe_to_insert:
                         continue
 
-                    relation['member'].insert(way_index + i, {
+                    relation['member'].insert(member_index, {
                         '@type': 'way',
                         '@ref': element_id_unique_map.get(element_id, element_id),
                         '@role': way_role,
                     })
 
-                    i += 1
+                    member_index += 1
+                    insert_count += 1
 
                     # stop inserting if exhausted the split ways
-                    if i == len(split_ways_in_order):
+                    if insert_count == len(split_ways_in_order):
                         break
 
                     # stop inserting if the next way is the after way
@@ -336,13 +343,17 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
                             break
 
                 # fallback to dummy insert if none were inserted
-                if i == 0:
-                    for i, (_, element_id) in enumerate(split_ways_in_order):
-                        relation['member'].insert(way_index + i, {
+                if insert_count == 0:
+                    print(f'🚧 Warning: Could not insert split ways into relation {relation["@id"]} (way {way_id})')
+                    for _, element_id in split_ways_in_order:
+                        relation['member'].insert(member_index, {
                             '@type': 'way',
                             '@ref': element_id_unique_map.get(element_id, element_id),
                             '@role': way_role,
                         })
+
+                        member_index += 1
+                        insert_count += 1
 
     return result.values()
 
@@ -362,6 +373,8 @@ async def build_osm_change(relation_id: int, route: FinalRoute, include_changese
         if element_id_parts.extraNum is not None:
             split_ways.add(element_id_parts.id)
             native_id_element_ids_map[element_id_parts.id][element_id_parts.extraNum] = element_id
+
+            assert element_id not in element_id_unique_map, f'Repeated element_id: {element_id}'
 
             if element_id_parts.extraNum == 1:
                 element_id_unique_map[element_id] = element_id_parts.id
