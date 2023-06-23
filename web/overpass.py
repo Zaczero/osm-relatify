@@ -341,6 +341,9 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
     # 3. discard unnamed if in area with named
     # 4. for each named group, pick best platform and best stop
 
+    if not bus_stops:
+        return []
+
     search_latLng = BUS_COLLECTION_SEARCH_AREA / 111_111
     search_latLng_rad = radians(search_latLng)
 

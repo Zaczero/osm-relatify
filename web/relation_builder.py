@@ -57,6 +57,9 @@ def interpolate_latLng(latLng1_rad: tuple[float, float], latLng2_rad: tuple[floa
 
 
 def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection], ways: Iterable[FetchRelationElement]) -> list[SortedBusEntry]:
+    if not bus_stop_collections:
+        return []
+
     interpolate_threshold = 60  # meters
     latLng_rad_idx_way_map: dict[tuple, tuple[int, FetchRelationElement]] = {}
     tree_coordinates_rad = []
