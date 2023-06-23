@@ -1,7 +1,7 @@
 import secrets
 from collections import defaultdict
 from dataclasses import replace
-from itertools import chain
+from itertools import chain, repeat
 from math import radians
 from typing import Iterable, NamedTuple, Sequence
 
@@ -9,6 +9,7 @@ import httpx
 import xmltodict
 from asyncache import cached
 from cachetools import TTLCache
+from scipy.optimize import linear_sum_assignment
 from sklearn.neighbors import BallTree
 
 from config import (BUS_COLLECTION_SEARCH_AREA,
@@ -462,36 +463,19 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
                     if len(stops) < len(best_platforms):
                         query_stops = (stops[i] for i in query_indices[:, 0])
                     else:
-                        assigned_stops = set()
-                        platform_stops = [None] * len(best_platforms)
+                        # use the Hungarian algorithm to find the optimal assignment
+                        row_ind, col_ind = linear_sum_assignment(query_distances)
 
-                        sorted_stops = sorted(
-                            (dist, plat_idx, stop_idx)
-                            for plat_idx, (dists, stop_indices) in enumerate(zip(query_distances, query_indices))
-                            for dist, stop_idx in zip(dists, stop_indices))
+                        # ensure the assignments are sorted by platform indices
+                        assignments = sorted(zip(row_ind, col_ind))
 
-                        for _, plat_idx, stop_idx in sorted_stops:
-                            # skip if the stop is already assigned
-                            if stop_idx in assigned_stops:
-                                continue
-
-                            # skip if the platform already has a stop
-                            if platform_stops[plat_idx] is not None:
-                                continue
-
-                            platform_stops[plat_idx] = stops[stop_idx]
-                            assigned_stops.add(stop_idx)
-
-                            # break if all platforms have a stop
-                            if len(assigned_stops) == len(best_platforms):
-                                break
-
-                        query_stops = platform_stops
+                        # get the assigned stop for each platform
+                        query_stops = (stops[query_indices[i][j]] for i, j in assignments)
 
                 elif len(stops) == 1:
-                    query_stops = (stops[0],) * len(best_platforms)
+                    query_stops = repeat(stops[0], len(best_platforms))
                 else:
-                    query_stops = (None,) * len(best_platforms)
+                    query_stops = repeat(None, len(best_platforms))
 
                 for best_platform, best_stop in zip(best_platforms, query_stops):
                     collections.append(FetchRelationBusStopCollection(

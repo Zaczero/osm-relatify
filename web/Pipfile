@@ -4,25 +4,25 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [packages]
+asyncache = "*"
 authlib = "*"
 cachetools = "*"
+dacite = "*"
 fastapi = "*"
+h2 = "*"
 httpx = "*"
 itsdangerous = "*"
 jinja2 = "*"
-starlette = "*"
-uvicorn = {extras = ["standard"], version = "*"}
-requests = "*"
-asyncache = "*"
-h2 = "*"
-dacite = "*"
-xmltodict = "*"
 numba = "*"
-scikit-learn = "*"
-tenacity = "*"
-rtree = "*"
 orjson = "*"
+requests = "*"
+rtree = "*"
+scikit-learn = "*"
 scipy = "*"
+starlette = "*"
+tenacity = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+xmltodict = "*"
 
 [dev-packages]
 autopep8 = "*"
