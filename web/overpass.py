@@ -22,6 +22,7 @@ from models.fetch_relation import (FetchRelationBusStop,
                                    FetchRelationBusStopCollection,
                                    FetchRelationElement, PublicTransport)
 from utils import get_http_client, radians_tuple
+from xmltodict_postprocessor import postprocessor
 
 # TODO: right hand side detection by querying roundabouts, and first/last bus stop
 
@@ -737,6 +738,7 @@ class Overpass:
 
         data: dict[str, list[dict]] = xmltodict.parse(
             r.text,
+            postprocessor=postprocessor,
             force_list=('relation', 'way', 'member', 'tag', 'nd'))['osm']
 
         relations = data.get('relation', [])
@@ -750,13 +752,16 @@ class Overpass:
                 continue
 
             for member in members:
-                member_id = int(member['@ref'])
-                if member['@type'] == 'way' and member_id in way_ids_set:
-                    id_relations_map[member_id].append(relation)
+                if member['@type'] == 'way' and member['@ref'] in way_ids_set:
+                    id_relations_map[member['@ref']].append(relation)
+
+        # deduplicate relations by id
+        for way_id, relations in id_relations_map.items():
+            id_relations_map[way_id] = list({r['@id']: r for r in relations}.values())
 
         ways = data.get('way', [])
         ways_map = {
-            int(w['@id']): w
+            w['@id']: w
             for w in ways}
 
         return QueryParentsResult(

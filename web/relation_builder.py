@@ -243,107 +243,106 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
 
         # iterate over each related relation
         for relation in parents.id_relations_map[way_id]:
-            relation_id = int(relation['@id'])
-
-            if relation_id == ignore_relation_id:
+            if relation['@id'] == ignore_relation_id:
                 continue
 
-            result[relation_id] = relation
+            result[relation['@id']] = relation
 
-            way_index = next(
-                i for i, member in enumerate(relation['member'])
-                if int(member['@ref']) == way_id)
-
-            way_role = relation['member'][way_index]['@role']
-
-            split_ways_in_order = list(sorted(element_ids.items(), key=lambda x: x[0]))
-            first_way_nd = id_way_map[split_ways_in_order[0][1]].nodes[0]
-            last_way_nd = id_way_map[split_ways_in_order[-1][1]].nodes[-1]
-            is_reversed = False
-
-            if way_index > 0 and (before_entry := relation['member'][way_index - 1]) and before_entry['@type'] == 'way':
-                before_way_id = int(before_entry['@ref'])
-                before_way_id = unique_native_id_map.get(before_way_id, before_way_id)
-                before_way = parents.ways_map[before_way_id]
-                before_way['nd'] = before_way.get('nd', [])
-
-                if not before_way['nd']:
-                    before_way = None
-            else:
-                before_way = None
-
-            if way_index + 1 < len(relation['member']) and (after_entry := relation['member'][way_index + 1]) and after_entry['@type'] == 'way':
-                after_way_id = int(after_entry['@ref'])
-                after_way_id = unique_native_id_map.get(after_way_id, after_way_id)
-                after_way = parents.ways_map[after_way_id]
-                after_way['nd'] = after_way.get('nd', [])
-
-                if not after_way['nd']:
-                    after_way = None
-            else:
-                after_way = None
-
-            if first_way_nd != last_way_nd:
-                # reverse is only valid for non-circular ways, e.g. roundabouts
-
-                if before_way is not None:
-                    if any(int(before_way['nd'][check]['@ref']) == last_way_nd for check in (0, -1)):
-                        split_ways_in_order.reverse()
-                        first_way_nd, last_way_nd = last_way_nd, first_way_nd
-                        is_reversed = True
-
-                elif after_way is not None:
-                    if any(int(after_way['nd'][check]['@ref']) == first_way_nd for check in (0, -1)):
-                        split_ways_in_order.reverse()
-                        first_way_nd, last_way_nd = last_way_nd, first_way_nd
-                        is_reversed = True
-
-            # remove the original way from the relation member list
-            relation['member'].pop(way_index)
-
-            # replace the original way in the relation member list with the split ways
-            i = 0
-            safe_to_insert = before_way is None
-
-            for _, element_id in islice(cycle(split_ways_in_order), len(split_ways_in_order) * 2):
-                element = id_way_map[element_id]
-
-                if not is_reversed:
-                    first_element_nd, last_element_nd = element.nodes[0], element.nodes[-1]
-                else:
-                    first_element_nd, last_element_nd = element.nodes[-1], element.nodes[0]
-
-                if not safe_to_insert:
-                    safe_to_insert = any(int(before_way['nd'][check]['@ref']) == first_element_nd for check in (0, -1))
-
-                if not safe_to_insert:
+            # reversed because we insert after way_index which breaks enumeration
+            for way_index, member in reversed(list(enumerate(relation['member']))):
+                if member['@ref'] != way_id:
                     continue
 
-                relation['member'].insert(way_index + i, {
-                    '@type': 'way',
-                    '@ref': element_id_unique_map.get(element_id, element_id),
-                    '@role': way_role,
-                })
+                way_role = relation['member'][way_index]['@role']
 
-                i += 1
+                split_ways_in_order = list(sorted(element_ids.items(), key=lambda x: x[0]))
+                first_way_nd = id_way_map[split_ways_in_order[0][1]].nodes[0]
+                last_way_nd = id_way_map[split_ways_in_order[-1][1]].nodes[-1]
+                is_reversed = False
 
-                # stop inserting if exhausted the split ways
-                if i == len(split_ways_in_order):
-                    break
+                if way_index > 0 and (before_entry := relation['member'][way_index - 1]) and before_entry['@type'] == 'way':
+                    before_way_id = before_entry['@ref']
+                    before_way_id = unique_native_id_map.get(before_way_id, before_way_id)
+                    before_way = parents.ways_map[before_way_id]
+                    before_way['nd'] = before_way.get('nd', [])
 
-                # stop inserting if the next way is the after way
-                if after_way is not None:
-                    if any(int(after_way['nd'][check]['@ref']) == last_element_nd for check in (0, -1)):
-                        break
+                    if not before_way['nd']:
+                        before_way = None
+                else:
+                    before_way = None
 
-            # fallback to dummy insert if none were inserted
-            if i == 0:
-                for i, (_, element_id) in enumerate(split_ways_in_order):
+                if way_index + 1 < len(relation['member']) and (after_entry := relation['member'][way_index + 1]) and after_entry['@type'] == 'way':
+                    after_way_id = after_entry['@ref']
+                    after_way_id = unique_native_id_map.get(after_way_id, after_way_id)
+                    after_way = parents.ways_map[after_way_id]
+                    after_way['nd'] = after_way.get('nd', [])
+
+                    if not after_way['nd']:
+                        after_way = None
+                else:
+                    after_way = None
+
+                if first_way_nd != last_way_nd:
+                    # reverse is only valid for non-circular ways, e.g. roundabouts
+
+                    if before_way is not None:
+                        if any(before_way['nd'][check]['@ref'] == last_way_nd for check in (0, -1)):
+                            split_ways_in_order.reverse()
+                            first_way_nd, last_way_nd = last_way_nd, first_way_nd
+                            is_reversed = True
+
+                    elif after_way is not None:
+                        if any(after_way['nd'][check]['@ref'] == first_way_nd for check in (0, -1)):
+                            split_ways_in_order.reverse()
+                            first_way_nd, last_way_nd = last_way_nd, first_way_nd
+                            is_reversed = True
+
+                # remove the original way from the relation member list
+                relation['member'].pop(way_index)
+
+                # replace the original way in the relation member list with the split ways
+                i = 0
+                safe_to_insert = before_way is None
+
+                for _, element_id in islice(cycle(split_ways_in_order), len(split_ways_in_order) * 2):
+                    element = id_way_map[element_id]
+
+                    if not is_reversed:
+                        first_element_nd, last_element_nd = element.nodes[0], element.nodes[-1]
+                    else:
+                        first_element_nd, last_element_nd = element.nodes[-1], element.nodes[0]
+
+                    if not safe_to_insert:
+                        safe_to_insert = any(before_way['nd'][check]['@ref'] == first_element_nd for check in (0, -1))
+
+                    if not safe_to_insert:
+                        continue
+
                     relation['member'].insert(way_index + i, {
                         '@type': 'way',
                         '@ref': element_id_unique_map.get(element_id, element_id),
                         '@role': way_role,
                     })
+
+                    i += 1
+
+                    # stop inserting if exhausted the split ways
+                    if i == len(split_ways_in_order):
+                        break
+
+                    # stop inserting if the next way is the after way
+                    if after_way is not None:
+                        if any(after_way['nd'][check]['@ref'] == last_element_nd for check in (0, -1)):
+                            break
+
+                # fallback to dummy insert if none were inserted
+                if i == 0:
+                    for i, (_, element_id) in enumerate(split_ways_in_order):
+                        relation['member'].insert(way_index + i, {
+                            '@type': 'way',
+                            '@ref': element_id_unique_map.get(element_id, element_id),
+                            '@role': way_role,
+                        })
 
     return result.values()
 
