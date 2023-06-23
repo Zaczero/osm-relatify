@@ -1,3 +1,4 @@
+import re
 import time
 from contextlib import contextmanager
 from math import atan2, cos, radians, sin, sqrt
@@ -45,6 +46,10 @@ def ensure_list(obj: dict | list[dict]) -> list[dict]:
         return obj
     else:
         return [obj]
+
+
+def normalize_name(name: str) -> str:
+    return re.sub(r'\s+', ' ', name).strip()
 
 
 @njit(fastmath=True)

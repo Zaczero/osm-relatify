@@ -379,7 +379,7 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
         # group by name in area
         name_groups: dict[str, list[FetchRelationBusStop]] = defaultdict(list)
         for bus_stop in area_group:
-            name_groups[bus_stop.name].append(bus_stop)
+            name_groups[bus_stop.groupName].append(bus_stop)
 
         # discard unnamed if in area with named
         if len(name_groups) > 1:
@@ -389,10 +389,11 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
         prefix_map = defaultdict(list)
 
         for name_group_key, name_group in name_groups.items():
-            parts = name_group_key.rsplit(' ', 1)
+            parts = name_group_key.split(' ')
 
-            if len(parts) == 2 and parts[1].isdecimal():
-                prefix_map[parts[0].strip()].append(name_group_key)
+            while len(parts) > 1 and parts[-1].isdecimal():
+                parts.pop()
+                prefix_map[' '.join(parts)].append(name_group_key)
 
         for prefix, name_group_keys in prefix_map.items():
             if (prefix_name_group := name_groups.get(prefix)) is None:
@@ -480,6 +481,10 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
 
                             platform_stops[plat_idx] = stops[stop_idx]
                             assigned_stops.add(stop_idx)
+
+                            # break if all platforms have a stop
+                            if len(assigned_stops) == len(best_platforms):
+                                break
 
                         query_stops = platform_stops
 

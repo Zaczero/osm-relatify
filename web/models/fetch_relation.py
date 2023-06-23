@@ -6,7 +6,7 @@ from typing import Self, Sequence
 from models.bounding_box import BoundingBox
 from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
-from utils import haversine_distance
+from utils import haversine_distance, normalize_name
 
 
 def _interpolate_coords(latLng1: tuple[float, float], latLng2: tuple[float, float], ratio: float) -> tuple[float, float]:
@@ -68,6 +68,7 @@ class FetchRelationBusStop:
     member: bool | None
     latLng: tuple[float, float]
     name: str
+    groupName: str
     highway: str | None
     public_transport: PublicTransport
 
@@ -82,7 +83,13 @@ class FetchRelationBusStop:
             type=data['type'],
             member=None,
             latLng=(data['lat'], data['lon']),
-            name=data['tags'].get('name', ''),
+            name=normalize_name(' '.join((
+                data['tags'].get('name', ''),
+                data['tags'].get('local_ref', '')))),
+            groupName=normalize_name(' '.join((
+                data['tags'].get('name', ''),
+                data['tags'].get('ref', ''),
+                data['tags'].get('local_ref', '')))).lower(),
             highway=data['tags'].get('highway', None),
             public_transport=PublicTransport(data['tags']['public_transport']))
 
