@@ -27,6 +27,7 @@ Please note that, for now, OSM Relatify only supports bus relations.
 - ✅ One-way streets
 - ✅ Roundabouts
 - ✅ Right-hand traffic
+- ✅ `ref` & `local_ref`
 - ✅ `public_transport:version=2`
 - ✅ `public_transport=platform`
 - ✅ `public_transport=stop_position`
