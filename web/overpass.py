@@ -452,13 +452,37 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
                 if len(stops) >= 2:
                     stops_tree = BallTree(tuple(radians_tuple(stop.latLng) for stop in stops), metric='haversine')
 
-                    query_indices = stops_tree.query(
+                    query_distances, query_indices = stops_tree.query(
                         tuple(radians_tuple(best_platform.latLng) for best_platform in best_platforms),
-                        k=1,
-                        return_distance=False,
-                        sort_results=False)
+                        k=min(len(stops), len(best_platforms)),
+                        return_distance=True,
+                        sort_results=True)
 
-                    query_stops = (stops[i] for i in query_indices[:, 0])
+                    if len(stops) < len(best_platforms):
+                        query_stops = (stops[i] for i in query_indices[:, 0])
+                    else:
+                        assigned_stops = set()
+                        platform_stops = [None] * len(best_platforms)
+
+                        sorted_stops = sorted(
+                            (dist, plat_idx, stop_idx)
+                            for plat_idx, (dists, stop_indices) in enumerate(zip(query_distances, query_indices))
+                            for dist, stop_idx in zip(dists, stop_indices))
+
+                        for _, plat_idx, stop_idx in sorted_stops:
+                            # skip if the stop is already assigned
+                            if stop_idx in assigned_stops:
+                                continue
+
+                            # skip if the platform already has a stop
+                            if platform_stops[plat_idx] is not None:
+                                continue
+
+                            platform_stops[plat_idx] = stops[stop_idx]
+                            assigned_stops.add(stop_idx)
+
+                        query_stops = platform_stops
+
                 elif len(stops) == 1:
                     query_stops = (stops[0],) * len(best_platforms)
                 else:
