@@ -59,8 +59,6 @@ RUN HASH=$(esbuild static/js/menu.js --bundle --minify | sha256sum | head -c8 ; 
     find templates -type f -exec sed -i 's|href="/static/css/style.css"|href="/static/css/style.'$HASH'.css"|g' {} \; && \
     sed -i -r "s|VERSION = '([0-9.]+)'|VERSION = '\1.$(date +%y%m%d)'|g" config.py
 
-RUN python -m compileall .
-
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
