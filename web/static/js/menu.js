@@ -45,6 +45,21 @@ loadRelationForm.addEventListener('submit', e => {
 
     const relationIdInput = loadRelationForm.querySelector('input[name=relation-id]')
     relationId = parseInt(relationIdInput.value)
+    if (isNaN(relationId)) {
+        const osmOrgRelationRegex = /https:\/\/(?:www\.)?openstreetmap.org\/relation\/(\d+)/;
+        const reMatch = relationIdInput.value.match(osmOrgRelationRegex);
+        if (reMatch !== null) {
+            relationId = parseInt(reMatch[1]);
+        } else {
+            console.log("invalid relation");
+            showMessage(
+                'danger',
+                '❌ invalid relation ID or URL',
+                'The relation id or URL entered is invalid',
+            )
+            return;
+        }
+    }
 
     relationIdInput.disabled = true
     loadRelationBtn.classList.add('btn-secondary')

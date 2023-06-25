@@ -4,10 +4,10 @@
 
     <div class="view" id="view-load">
         <h5 class="title">
-            Enter a <b>bus route</b> relation ID
+            Enter a <b>bus route</b> relation ID or URL
         </h5>
         <form class="body" id="load-relation-form">
-            <input type="number" class="form-control mb-2" name="relation-id"
+            <input class="form-control mb-2" name="relation-id"
                 value="{{ request.query_params.get('relation', '') }}" required>
             <button type="submit" class="btn btn-load btn-primary w-100">
                 Load
