@@ -51,15 +51,15 @@ map.on('contextmenu', function (e) {
 // map tiles
 const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 const baseLayers = {
-    'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    'OpenStreetMap': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: attribution,
         maxZoom: 19,
-        subdomains: 'abc'
+        
     }),
-    'OpenStreetMap DE': L.tileLayer('https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png', {
+    'OpenStreetMap DE': L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
         attribution: attribution,
         maxZoom: 19,
-        subdomains: 'abcd'
+        
     }),
     'OpenStreetMap FR': L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
         attribution: attribution,
