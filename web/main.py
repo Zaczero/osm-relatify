@@ -150,6 +150,7 @@ class PostQueryModel(BaseModel):
     relationId: int
     downloadHistory: dict | None = None
     downloadTargets: tuple[dict, ...] | None = None
+    reload: bool = False
 
 
 @app.post('/query')
@@ -160,6 +161,9 @@ async def post_query(model: PostQueryModel, user: dict = Depends(require_user_de
     if model.downloadHistory is not None:
         download_hist = from_dict(DownloadHistory, model.downloadHistory, Config(cast=[tuple], strict=True))
         download_targets = tuple(from_dict(Cell, t, Config(cast=[], strict=True)) for t in model.downloadTargets)
+
+        if model.reload:
+            download_hist = replace(download_hist, session=DownloadHistory.make_session())
     else:
         download_hist = None
         download_targets = None
@@ -193,7 +197,7 @@ async def post_query(model: PostQueryModel, user: dict = Depends(require_user_de
         bus_stop_collections = assign_none_members(bus_stop_collections, relation)
 
     return FetchRelation(
-        fetchMerge=len(download_hist.history) > 1,
+        fetchMerge=len(download_hist.history) > 1 or model.reload,
         nameOrRef=relation_tags.get('name', relation_tags.get('ref', '')).strip(),
         bounds=bounds,
         downloadHistory=download_hist,

@@ -1,5 +1,5 @@
 import { processBusStopData } from './busStopsLayer.js'
-import { processRelationDownloadTriggers } from './downloadTriggers.js'
+import { downloadHistoryData, processRelationDownloadTriggers } from './downloadTriggers.js'
 import { map } from './map.js'
 import { showMessage } from './messageBox.js'
 import { createElementFromHTML, deflateCompress } from './utils.js'
@@ -13,6 +13,7 @@ const loadRelationBtn = loadRelationForm.querySelector('button[type=submit]')
 const relationIdElements = document.querySelectorAll('.view .relation-id')
 const relationUrlElements = document.querySelectorAll('.view .relation-url')
 const editBackBtn = document.querySelector('#view-edit .btn-back')
+const editReloadBtn = document.querySelector('#view-edit .btn-reload')
 const editTags = document.getElementById('edit-tags')
 const editWarnings = document.getElementById('edit-warnings')
 const editSubmitBtn = document.querySelector('#view-edit .btn-next')
@@ -190,6 +191,57 @@ const unload = () => {
 }
 
 editBackBtn.onclick = unload
+
+editReloadBtn.onclick = async () => {
+    editBackBtn.disabled = true
+    editReloadBtn.disabled = true
+
+    const defaultInnerText = editReloadBtn.innerText
+    editReloadBtn.innerText = 'Reloading...'
+
+    fetch('/query', {
+        method: 'POST',
+        headers: {
+            'Content-Encoding': 'deflate',
+            'Content-Type': 'application/json'
+        },
+        body: await deflateCompress({
+            relationId: relationId,
+            downloadHistory: downloadHistoryData,
+            downloadTargets: [],
+            reload: true
+        }),
+    })
+        .then(async resp => {
+            if (!resp.ok) {
+                showMessage(
+                    'danger',
+                    `❌ Relation reload failed - ${resp.status}`,
+                    await resp.text()
+                )
+                return
+            }
+
+            return resp.json()
+        })
+        .then(data => {
+            processFetchRelationData(data)
+        })
+        .catch(error => {
+            console.error(error)
+            showMessage(
+                'danger',
+                '❌ Relation reload failed',
+                error
+            )
+        })
+        .finally(() => {
+            editReloadBtn.innerText = defaultInnerText
+
+            editBackBtn.disabled = false
+            editReloadBtn.disabled = false
+        })
+}
 
 editSubmitBtn.onclick = () => {
     switchView('submit')

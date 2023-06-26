@@ -618,6 +618,9 @@ class Overpass:
         return split_by_count(elements)
 
     async def _query_relation_history(self, relation_id: int, download_hist: DownloadHistory) -> tuple[list[list[dict]], BoundingBoxCollection]:
+        if not download_hist.history or not all(download_hist.history):
+            raise ValueError('No grid cells to download')
+
         all_elements_split = None
         all_bbs = []
 
@@ -678,12 +681,9 @@ class Overpass:
 
             union_grid_cells = download_targets
 
-        if not union_grid_cells:
-            raise ValueError('No grid cells to download')
-
         if download_hist is None:
-            download_hist = DownloadHistory(session=secrets.token_urlsafe(16), history=(union_grid_cells,))
-        else:
+            download_hist = DownloadHistory(session=DownloadHistory.make_session(), history=(union_grid_cells,))
+        elif union_grid_cells:
             download_hist = replace(download_hist, history=download_hist.history + (union_grid_cells,))
 
         elements_split, bbc = await self._query_relation_history(relation_id, download_hist)

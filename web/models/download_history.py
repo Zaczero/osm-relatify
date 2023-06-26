@@ -1,5 +1,5 @@
+import secrets
 from dataclasses import dataclass
-from typing import NamedTuple
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,3 +15,7 @@ class DownloadHistory:
 
     def __hash__(self) -> int:
         return hash(self.session)
+
+    @staticmethod
+    def make_session() -> str:
+        return secrets.token_urlsafe(16)
