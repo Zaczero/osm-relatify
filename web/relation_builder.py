@@ -374,14 +374,16 @@ async def build_osm_change(relation_id: int, route: FinalRoute, include_changese
             split_ways.add(element_id_parts.id)
             native_id_element_ids_map[element_id_parts.id][element_id_parts.extraNum] = element_id
 
-            assert element_id not in element_id_unique_map, f'Repeated element_id: {element_id}'
+            if element_id not in element_id_unique_map:
+                if element_id_parts.extraNum == 1:
+                    element_id_unique_map[element_id] = element_id_parts.id
+                else:
+                    element_id_unique_map[element_id] = next_unique_id
+                    unique_native_id_map[next_unique_id] = element_id_parts.id
+                    next_unique_id -= 1
 
-            if element_id_parts.extraNum == 1:
-                element_id_unique_map[element_id] = element_id_parts.id
             else:
-                element_id_unique_map[element_id] = next_unique_id
-                unique_native_id_map[next_unique_id] = element_id_parts.id
-                next_unique_id -= 1
+                print(f'🚧 Warning: Repeated element_id: {element_id}')
 
     for group in native_id_element_ids_map.values():
         assert len(group) == split_element_id(group[1]).maxNum, \
