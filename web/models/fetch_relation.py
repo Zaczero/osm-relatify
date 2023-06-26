@@ -150,8 +150,21 @@ def find_start_stop_ways(ways: dict[ElementId, FetchRelationElement], id_map: di
 
         return all_way_ids[len(all_way_ids) // 2]
 
-    start_way_id = get_endpoint_id(member_ids[0])
-    stop_way_id = get_endpoint_id(member_ids[-1])
+    for i in range(len(member_ids)):
+        start_way_id = get_endpoint_id(member_ids[i])
+
+        if start_way_id is not None:
+            break
+    else:
+        start_way_id = None
+
+    for i in range(len(member_ids) - 1, -1, -1):
+        stop_way_id = get_endpoint_id(member_ids[i])
+
+        if stop_way_id is not None:
+            break
+    else:
+        stop_way_id = None
 
     if start_way_id is None and stop_way_id is not None:
         start_way_id = stop_way_id
