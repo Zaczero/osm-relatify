@@ -393,7 +393,7 @@ def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[F
         for name_group_key, name_group in name_groups.items():
             parts = name_group_key.split(' ')
 
-            while len(parts) > 1 and parts[-1].isdecimal():
+            if len(parts) > 1 and parts[-1].isdecimal():
                 parts.pop()
                 prefix_map[' '.join(parts)].append(name_group_key)
 

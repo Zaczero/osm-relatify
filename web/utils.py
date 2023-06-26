@@ -48,8 +48,17 @@ def ensure_list(obj: dict | list[dict]) -> list[dict]:
         return [obj]
 
 
-def normalize_name(name: str) -> str:
-    return re.sub(r'\s+', ' ', name).strip()
+def normalize_name(name: str, *, lower: bool = False, number: bool = False, whitespace: bool = False) -> str:
+    if lower:
+        name = name.lower()
+
+    if number:
+        name = re.sub(r'(^|\D)0+', r'\1', name)
+
+    if whitespace:
+        name = re.sub(r'\s+', ' ', name).strip()
+
+    return name
 
 
 @njit(fastmath=True)

@@ -78,18 +78,20 @@ class FetchRelationBusStop:
 
     @classmethod
     def from_data(cls, data: dict) -> Self:
+        name = normalize_name(' '.join((
+            data['tags'].get('name', ''),
+            data['tags'].get('local_ref', ''))),
+            whitespace=True)
+
+        group_name = normalize_name(name, lower=True, number=True)
+
         return cls(
             id=ElementId(data['id']),
             type=data['type'],
             member=None,
             latLng=(data['lat'], data['lon']),
-            name=normalize_name(' '.join((
-                data['tags'].get('name', ''),
-                data['tags'].get('local_ref', '')))),
-            groupName=normalize_name(' '.join((
-                data['tags'].get('name', ''),
-                data['tags'].get('ref', ''),
-                data['tags'].get('local_ref', '')))).lower(),
+            name=name,
+            groupName=group_name,
             highway=data['tags'].get('highway', None),
             public_transport=PublicTransport(data['tags']['public_transport']))
 
