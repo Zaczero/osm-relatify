@@ -146,6 +146,27 @@ async def logout(request: Request):
     return response
 
 
+def get_route_type(tags: dict[str, str]) -> str | None:
+    if tags.get('public_transport:version') != '2':
+        return None
+
+    type = tags.get('type')
+
+    if type not in {
+            'route',
+            'disused:route',
+            'was:route'}:
+        return None
+
+    type_specifier = tags.get(type)
+
+    if type_specifier not in {
+            'bus'}:
+        return None
+
+    return type_specifier
+
+
 class PostQueryModel(BaseModel):
     relationId: int
     downloadHistory: dict | None = None
@@ -182,9 +203,7 @@ async def post_query(model: PostQueryModel, user: dict = Depends(require_user_de
 
         relation_tags = relation.get('tags', {})
 
-        if relation_tags.get('type') != 'route' or \
-                relation_tags.get('route') != 'bus' or \
-                relation_tags.get('public_transport:version') != '2':
+        if get_route_type(relation_tags) is None:
             query_task.cancel()
             raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Relation must be a PTv2 bus route')
 
