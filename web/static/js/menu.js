@@ -10,6 +10,7 @@ import { routeData } from './waysRoute.js'
 const busAnimationElement = document.getElementById('bus-animation')
 const loadRelationForm = document.getElementById('load-relation-form')
 const loadRelationBtn = loadRelationForm.querySelector('button[type=submit]')
+const relationIdInput = loadRelationForm.querySelector('input[name=relation-id]');
 const relationIdElements = document.querySelectorAll('.view .relation-id')
 const relationUrlElements = document.querySelectorAll('.view .relation-url')
 const editBackBtn = document.querySelector('#view-edit .btn-back')
@@ -37,30 +38,24 @@ const switchView = name => {
     activeView = name
 }
 
+relationIdInput.addEventListener('input', e => {
+    const osmOrgRelationRegex = /\d+/;
+    const reMatch = relationIdInput.value.match(osmOrgRelationRegex);
+    if (reMatch !== null) {
+        e.target.value = reMatch[0];
+        e.target.defaultValue = reMatch[0];
+    } else {
+        e.target.value = '';
+    }
+});
+
 loadRelationForm.addEventListener('submit', e => {
     e.preventDefault()
 
     if (loadRelationBtn.classList.contains('is-loading'))
         return
 
-    const relationIdInput = loadRelationForm.querySelector('input[name=relation-id]')
     relationId = parseInt(relationIdInput.value)
-    if (isNaN(relationId)) {
-        const osmOrgRelationRegex = /https:\/\/(?:www\.)?openstreetmap.org\/relation\/(\d+)/;
-        const reMatch = relationIdInput.value.match(osmOrgRelationRegex);
-        if (reMatch !== null) {
-            relationId = parseInt(reMatch[1]);
-        } else {
-            console.log("invalid relation");
-            showMessage(
-                'danger',
-                '❌ invalid relation ID or URL',
-                'The relation id or URL entered is invalid',
-            )
-            return;
-        }
-    }
-
     relationIdInput.disabled = true
     loadRelationBtn.classList.add('btn-secondary')
     loadRelationBtn.classList.add('is-loading')
