@@ -7,7 +7,7 @@
             Enter a <b>bus route</b> relation ID
         </h5>
         <form class="body" id="load-relation-form">
-            <input class="form-control mb-2" name="relation-id"
+            <input type="text" class="form-control mb-2" name="relation-id"
                 value="{{ request.query_params.get('relation', '') }}" required>
             <button type="submit" class="btn btn-load btn-primary w-100">
                 Load
