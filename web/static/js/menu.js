@@ -10,7 +10,7 @@ import { routeData } from './waysRoute.js'
 const busAnimationElement = document.getElementById('bus-animation')
 const loadRelationForm = document.getElementById('load-relation-form')
 const loadRelationBtn = loadRelationForm.querySelector('button[type=submit]')
-const relationIdInput = loadRelationForm.querySelector('input[name=relation-id]');
+const relationIdInput = loadRelationForm.querySelector('input[name=relation-id]')
 const relationIdElements = document.querySelectorAll('.view .relation-id')
 const relationUrlElements = document.querySelectorAll('.view .relation-url')
 const editBackBtn = document.querySelector('#view-edit .btn-back')
@@ -40,14 +40,8 @@ const switchView = name => {
 }
 
 relationIdInput.addEventListener('input', e => {
-    const osmOrgRelationRegex = /\d+/;
-    const reMatch = relationIdInput.value.match(osmOrgRelationRegex);
-    if (reMatch !== null) {
-        e.target.value = reMatch[0];
-        e.target.defaultValue = reMatch[0];
-    } else {
-        e.target.value = '';
-    }
+    const match = relationIdInput.value.match(/\d+/)
+    e.target.value = match !== null ? match[0] : ''
 });
 
 loadRelationForm.addEventListener('submit', e => {
