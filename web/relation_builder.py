@@ -175,7 +175,14 @@ def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationM
     for i, collection in enumerate(route.busStops):
         is_first = i == 0
         is_last = i == len(route.busStops) - 1
-        suffix = '_entry_only' if is_first else ('_exit_only' if is_last else '')
+
+        if route.roundtrip:
+            suffix = ''
+        else:
+            suffix = '_entry_only' if is_first else ('_exit_only' if is_last else '')
+
+        stop_member = None
+        platform_member = None
 
         if collection.stop is not None:
             role = 'stop' + suffix
@@ -184,7 +191,8 @@ def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationM
                 if member.role.startswith(role):
                     role = member.role
 
-            members.append(RelationMember(id=collection.stop.id, type=collection.stop.type, role=role))
+            stop_member = RelationMember(id=collection.stop.id, type=collection.stop.type, role=role)
+            members.append(stop_member)
 
         if collection.platform is not None:
             role = 'platform' + suffix
@@ -193,7 +201,15 @@ def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationM
                 if member.role.startswith(role):
                     role = member.role
 
-            members.append(RelationMember(id=collection.platform.id, type=collection.platform.type, role=role))
+            platform_member = RelationMember(id=collection.platform.id, type=collection.platform.type, role=role)
+            members.append(platform_member)
+
+    if route.roundtrip and members:
+        # order: stop, platform
+        if platform_member is not None:
+            members.insert(0, platform_member)
+        if stop_member is not None:
+            members.insert(0, stop_member)
 
     way_ids = [route_way.way.id for route_way in route.ways]
     way_ids = _simplify_way_ids(way_ids)

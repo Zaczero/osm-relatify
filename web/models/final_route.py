@@ -33,6 +33,7 @@ class FinalRoute:
     ways: tuple[FinalRouteWay, ...]
     latLngs: tuple[tuple[float, float], ...]
     busStops: tuple[FetchRelationBusStopCollection, ...]
+    tags: dict[str, str]
 
     # remaining parts of split ways, which are not members of the route
     extraWaysToUpdate: tuple[FetchRelationElement, ...] = None
@@ -40,3 +41,7 @@ class FinalRoute:
     members: tuple[RelationMember, ...] = None
 
     warnings: tuple[FinalRouteWarning, ...] = None
+
+    @property
+    def roundtrip(self) -> bool:
+        return self.tags.get('roundtrip', 'no') == 'yes'

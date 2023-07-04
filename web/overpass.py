@@ -1,20 +1,15 @@
-import secrets
 from collections import defaultdict
 from dataclasses import replace
-from itertools import chain, repeat
-from math import radians
+from itertools import chain
 from typing import Iterable, NamedTuple, Sequence
 
 import httpx
-import numpy as np
 import xmltodict
 from asyncache import cached
 from cachetools import TTLCache
-from scipy.optimize import linear_sum_assignment
-from sklearn.neighbors import BallTree
 
-from config import (BUS_COLLECTION_SEARCH_AREA,
-                    DOWNLOAD_RELATION_GRID_CELL_EXPAND,
+from bus_collection_builder import build_bus_stop_collections
+from config import (DOWNLOAD_RELATION_GRID_CELL_EXPAND,
                     DOWNLOAD_RELATION_WAY_BB_EXPAND, OVERPASS_API_INTERPRETER)
 from models.bounding_box import BoundingBox
 from models.bounding_box_collection import BoundingBoxCollection
@@ -22,8 +17,8 @@ from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
 from models.fetch_relation import (FetchRelationBusStop,
                                    FetchRelationBusStopCollection,
-                                   FetchRelationElement, PublicTransport)
-from utils import get_http_client, haversine_distance, radians_tuple
+                                   FetchRelationElement)
+from utils import get_http_client
 from xmltodict_postprocessor import postprocessor
 
 # TODO: right hand side detection by querying roundabouts, and first/last bus stop
@@ -254,7 +249,6 @@ def merge_relations_tags(relations: Iterable[dict], elements: Iterable[dict], ro
 
     for relation in sorted(relations, key=lambda r: r['id']):
         for member in (m for m in relation['members'] if m['role'] == role):
-
             platform = element_map.get((member['type'], member['ref']), None)
 
             if platform is None:
@@ -332,203 +326,9 @@ def preprocess_elements(elements: Iterable[dict]) -> Sequence[dict]:
     # extract center
     for e in result:
         if 'center' in e:
-            e['lat'] = e['center']['lat']
-            e['lon'] = e['center']['lon']
+            e |= e['center']
 
     return result
-
-
-def create_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[FetchRelationBusStopCollection]:
-    # 1. group by area
-    # 2. group by name in area
-    # 3. discard unnamed if in area with named
-    # 4. for each named group, pick best platform and best stop
-
-    if not bus_stops:
-        return []
-
-    search_latLng = BUS_COLLECTION_SEARCH_AREA / 111_111
-    search_latLng_rad = radians(search_latLng)
-
-    bus_stops_coordinates = tuple(radians_tuple(bus_stop.latLng) for bus_stop in bus_stops)
-    bus_stops_tree = BallTree(bus_stops_coordinates, metric='haversine')
-
-    areas: dict[int, int] = {}
-
-    query_indices, _ = bus_stops_tree.query_radius(
-        bus_stops_coordinates,
-        r=search_latLng_rad,
-        return_distance=True,
-        sort_results=True)
-
-    # group by area
-    for i, indices in enumerate(query_indices):
-        for j in indices[1:]:
-            if (j_in := areas.get(j)) is not None:
-                areas[i] = j_in
-                break
-        else:
-            areas[i] = i
-
-    area_groups: dict[int, list[FetchRelationBusStop]] = defaultdict(list)
-
-    for member_index, area_index in areas.items():
-        area_groups[area_index].append(bus_stops[member_index])
-
-    collections: list[FetchRelationBusStopCollection] = []
-
-    for area_group in area_groups.values():
-        # group by name in area
-        name_groups: dict[str, list[FetchRelationBusStop]] = defaultdict(list)
-        for bus_stop in area_group:
-            name_groups[bus_stop.groupName].append(bus_stop)
-
-        # discard unnamed if in area with named
-        if len(name_groups) > 1:
-            name_groups.pop('', None)
-
-        # expand non-number suffixed groups to number suffixed groups if needed
-        prefix_map = defaultdict(list)
-
-        for name_group_key, name_group in name_groups.items():
-            parts = name_group_key.split(' ')
-
-            if len(parts) > 1 and parts[-1].isdecimal():
-                parts.pop()
-                prefix_map[' '.join(parts)].append(name_group_key)
-
-        for prefix, name_group_keys in prefix_map.items():
-            if (prefix_name_group := name_groups.get(prefix)) is None:
-                continue
-
-            success = False
-
-            for name_group_key in name_group_keys:
-                name_group = name_groups[name_group_key]
-
-                for prefix_bus_stop in prefix_name_group:
-                    if not any(
-                            bus_stop.public_transport == prefix_bus_stop.public_transport
-                            for bus_stop in name_group):
-                        name_group.append(prefix_bus_stop)
-                        success = True
-
-            if success:
-                name_groups.pop(prefix)
-
-        # for each named group, pick best platform and best stop
-        for name_group_key, name_group in name_groups.items():
-            platforms: list[FetchRelationBusStop] = []
-            stops: list[FetchRelationBusStop] = []
-
-            for bus_stop in name_group:
-                if bus_stop.public_transport == PublicTransport.PLATFORM:
-                    platforms.append(bus_stop)
-                elif bus_stop.public_transport == PublicTransport.STOP_POSITION:
-                    stops.append(bus_stop)
-                else:
-                    raise NotImplementedError(f'Unknown public transport type: {bus_stop.public_transport}')
-
-            platforms.sort(key=lambda p: p.id)
-            stops.sort(key=lambda s: s.id)
-
-            def pick_best(elements: list[FetchRelationBusStop], *, limit_else: bool) -> tuple[Sequence[FetchRelationBusStop], bool]:
-                if not elements:
-                    return tuple(), False
-
-                elements_explicit = tuple(e for e in elements if e.highway == 'bus_stop')
-
-                if elements_explicit:
-                    return elements_explicit, True
-
-                elements_implicit = tuple(e for e in elements if e.highway != 'bus_stop')
-
-                return ((elements_implicit[0],) if limit_else else elements_implicit), False
-
-            best_platforms, platforms_explicit = pick_best(platforms, limit_else=True)
-            best_stops, stops_explicit = pick_best(stops, limit_else=False)
-
-            if platforms_explicit and stops_explicit:
-                print(f'🚧 Warning: Unexpected explicit platforms and stops for {name_group_key}')
-
-            if platforms_explicit:
-                if len(stops) >= 2:
-                    # find the closest stop to each platform
-                    if len(stops) < len(best_platforms):
-                        stops_tree = BallTree(tuple(radians_tuple(stop.latLng) for stop in stops), metric='haversine')
-                        query_indices = stops_tree.query(
-                            tuple(radians_tuple(best_platform.latLng) for best_platform in best_platforms),
-                            k=1,
-                            return_distance=False,
-                            sort_results=False)
-
-                        query_stops = (stops[i] for i in query_indices[:, 0])
-
-                    # minimize the total distance between each platform and stop
-                    else:
-                        distance_matrix = np.zeros((len(best_platforms), len(stops)))
-
-                        # compute the haversine distance between each platform and stop
-                        for i, platform in enumerate(best_platforms):
-                            for j, stop in enumerate(stops):
-                                distance_matrix[i, j] = haversine_distance(platform.latLng, stop.latLng)
-
-                        # use the Hungarian algorithm to find the optimal assignment
-                        row_ind, col_ind = linear_sum_assignment(distance_matrix)
-
-                        # ensure the assignments are sorted by platform indices
-                        assignments = sorted(zip(row_ind, col_ind))
-
-                        # get the assigned stop for each platform
-                        query_stops = (stops[j] for _, j in assignments)
-
-                elif len(stops) == 1:
-                    query_stops = repeat(stops[0], len(best_platforms))
-                else:
-                    query_stops = repeat(None, len(best_platforms))
-
-                for best_platform, best_stop in zip(best_platforms, query_stops):
-                    collections.append(FetchRelationBusStopCollection(
-                        platform=best_platform,
-                        stop=best_stop))
-
-                continue
-
-            assert len(best_platforms) <= 1
-
-            if stops_explicit:
-                if len(best_stops) <= 1:
-                    best_platform = best_platforms[0] if best_platforms else None
-
-                    for best_stop in best_stops:
-                        collections.append(FetchRelationBusStopCollection(
-                            platform=best_platform,
-                            stop=best_stop))
-                else:
-                    for best_stop in best_stops:
-                        collections.append(FetchRelationBusStopCollection(
-                            platform=None,
-                            stop=best_stop))
-
-                continue
-
-            if best_platforms:
-                for best_platform in best_platforms:
-                    collections.append(FetchRelationBusStopCollection(
-                        platform=best_platform,
-                        stop=None))
-
-                continue
-
-            if best_stops:
-                for best_stop in best_stops:
-                    collections.append(FetchRelationBusStopCollection(
-                        platform=None,
-                        stop=best_stop))
-
-                continue
-
-    return collections
 
 
 def optimize_cells_and_get_bbs(cells: Sequence[Cell], *, start_horizontal: bool) -> tuple[Sequence[BoundingBox], Sequence[BoundingBox]]:
@@ -740,7 +540,7 @@ class Overpass:
             if is_bus_related(e['tags']) or not is_rail_related(e['tags']))
 
         bus_stops = tuple(FetchRelationBusStop.from_data(e) for e in bus_elements_ex)
-        bus_stop_collections = create_bus_stop_collections(bus_stops)
+        bus_stop_collections = build_bus_stop_collections(bus_stops)
         bus_stop_collections = tuple(
             c for c in bus_stop_collections
             if bbc.contains(c.best.latLng))

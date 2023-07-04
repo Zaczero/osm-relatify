@@ -503,7 +503,7 @@ async def modified_dfs(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, 
     return best_path.valid if best_path.valid.path else best_path.invalid
 
 
-def finalize_route(best_path: BestPath, ways: dict[ElementId, FetchRelationElement], bus_stop_collections: list[FetchRelationBusStopCollection]) -> FinalRoute:
+def finalize_route(best_path: BestPath, ways: dict[ElementId, FetchRelationElement], bus_stop_collections: list[FetchRelationBusStopCollection], tags: dict[str, str]) -> FinalRoute:
     route_ways = tuple(
         FinalRouteWay(
             way=ways[key.way_id],
@@ -538,10 +538,11 @@ def finalize_route(best_path: BestPath, ways: dict[ElementId, FetchRelationEleme
     return FinalRoute(
         ways=route_ways,
         latLngs=route_latLngs,
-        busStops=tuple(route_bus_stops))
+        busStops=tuple(route_bus_stops),
+        tags=tags)
 
 
-async def calc_bus_route(ways_members: dict[ElementId, FetchRelationElement], start_way: ElementId, end_way: ElementId, bus_stop_collections: list[FetchRelationBusStopCollection], executor: ProcessPoolExecutor, n_processes: int) -> FinalRoute:
+async def calc_bus_route(ways_members: dict[ElementId, FetchRelationElement], start_way: ElementId, end_way: ElementId, bus_stop_collections: list[FetchRelationBusStopCollection], tags: dict[str, str], executor: ProcessPoolExecutor, n_processes: int) -> FinalRoute:
     with print_run_time('Sorting bus stops'):
         sorted_buses = sort_bus_on_path(bus_stop_collections, ways_members.values())
 
@@ -556,4 +557,4 @@ async def calc_bus_route(ways_members: dict[ElementId, FetchRelationElement], st
     with print_run_time('Calculating route'):
         best_path = await modified_dfs(graph, ways_members, start_way, end_way, id_sorted_bus_map, executor, n_processes)
 
-    return finalize_route(best_path, ways_members, bus_stop_collections)
+    return finalize_route(best_path, ways_members, bus_stop_collections, tags)

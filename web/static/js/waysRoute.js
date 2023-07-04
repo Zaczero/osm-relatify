@@ -1,6 +1,6 @@
 import { clearAntPath, processRouteAntPath } from './antPathLayer.js'
 import { busStopData } from './busStopsLayer.js'
-import { processRouteStops, processRouteWarnings, relationId } from './menu.js'
+import { processRouteStops, processRouteWarnings, relationId, relationTags } from './menu.js'
 import { deflateCompress, deflateDecompress } from './utils.js'
 import { startWay, stopWay } from './waysEndpoint.js'
 import { waysData } from './waysLayer.js'
@@ -43,7 +43,7 @@ export function requestCalcBusRoute() {
             busStops.push(busStopCollection)
     }
 
-    calcBusRoute(startWay.id, stopWay.id, ways, busStops)
+    calcBusRoute(startWay.id, stopWay.id, ways, busStops, relationTags)
 }
 
 const minReconnectInterval = 200
@@ -61,7 +61,7 @@ const onopen = async () => {
     if (!calcBusRouteScheduledArgs || awaitingResponse)
         return
 
-    const [startWay, stopWay, ways, busStops] = calcBusRouteScheduledArgs
+    const [startWay, stopWay, ways, busStops, tags] = calcBusRouteScheduledArgs
     calcBusRouteScheduledArgs = null
     awaitingResponse = true
 
@@ -70,7 +70,8 @@ const onopen = async () => {
         startWay: startWay,
         stopWay: stopWay,
         ways: ways,
-        busStops: busStops
+        busStops: busStops,
+        tags: tags
     })
 
     ws.send(body)

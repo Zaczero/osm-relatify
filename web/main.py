@@ -235,6 +235,7 @@ class PostCalcBusRouteModel:
     stopWay: ElementId
     ways: dict[ElementId | str, FetchRelationElement]
     busStops: list[FetchRelationBusStopCollection]
+    tags: dict[str, str]
 
 
 @app.websocket('/ws/calc_bus_route')
@@ -282,6 +283,7 @@ async def post_calc_bus_route(ws: WebSocket, user: dict = Depends(require_user_d
                             model.startWay,
                             model.stopWay,
                             model.busStops,
+                            model.tags,
                             process_executor,
                             n_processes=CALC_ROUTE_N_PROCESSES),
                         timeout=3))

@@ -1,7 +1,8 @@
+import enum
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Self, Sequence
+from typing import Self
 
 from models.bounding_box import BoundingBox
 from models.download_history import Cell, DownloadHistory
@@ -177,35 +178,52 @@ def find_start_stop_ways(ways: dict[ElementId, FetchRelationElement], id_map: di
 
 
 def assign_none_members(bus_stop_collections: list[FetchRelationBusStopCollection], relation: dict) -> list[FetchRelationBusStopCollection]:
+    collection_platform_use_counter = defaultdict(int)
     collection_stop_use_counter = defaultdict(int)
-
-    for collection in bus_stop_collections:
-        if collection.stop is not None:
-            collection_stop_use_counter[collection.stop.typed_id] += 1
-
-    member_ids_set = {(m['type'], ElementId(m['ref'])) for m in relation['members']}
     result = []
 
     for collection in bus_stop_collections:
-        member = False
+        if collection.platform is not None:
+            collection_platform_use_counter[collection.platform.typed_id] += 1
 
-        if collection.platform is not None and collection.platform.member is None:
-            platform_key = collection.platform.typed_id
-            member = platform_key in member_ids_set
+            if collection_platform_use_counter[collection.platform.typed_id] > 1:
+                print(f'🚧 Warning: Platform {collection.platform.id} is used by multiple collections')
 
-        if not member and collection.stop is not None and collection.stop.member is None:
-            stop_key = collection.stop.typed_id
-
-            # collections may share the same stop
-            # it's safe to use stop as a member indicator
-            # only if it's used by a single collection
-            if collection_stop_use_counter[stop_key] == 1:
-                member = stop_key in member_ids_set
-
-        collection = replace(collection,
-                             platform=replace(collection.platform, member=member) if collection.platform else None,
-                             stop=replace(collection.stop, member=member) if collection.stop else None)
+        if collection.stop is not None:
+            collection_stop_use_counter[collection.stop.typed_id] += 1
 
         result.append(collection)
+
+    # 1 pass: assign platform as a member for any platform
+    for member in relation['members']:
+        typed_id = (member['type'], ElementId(member['ref']))
+
+        # != 1 because platforms should not be reused by multiple collections
+        # see bus_collection_builder: element_reuse
+        if collection_platform_use_counter[typed_id] != 1:
+            continue
+
+        for i, collection in enumerate(result):
+            if collection.platform is not None and collection.platform.typed_id == typed_id:
+                result[i] = replace(collection,
+                                    platform=replace(collection.platform, member=True),
+                                    stop=replace(collection.stop, member=True) if collection.stop else None)
+                break
+
+    # 2 pass: assign stop as a member for stop w/o platform
+    for member in relation['members']:
+        typed_id = (member['type'], ElementId(member['ref']))
+
+        # collections may share the same stop
+        # it's safe to use stop as a member indicator
+        # only if it's used by a single collection
+        if collection_stop_use_counter[typed_id] != 1:
+            continue
+
+        for i, collection in enumerate(result):
+            if collection.platform is None and collection.stop is not None and collection.stop.typed_id == typed_id:
+                result[i] = replace(collection,
+                                    stop=replace(collection.stop, member=True))
+                break
 
     return result

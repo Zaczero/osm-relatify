@@ -24,6 +24,7 @@ const submitUploadBtn = document.querySelector('#view-submit .btn-upload')
 const submitDownloadBtn = document.querySelector('#view-submit .btn-download')
 
 export let relationId = null
+export let relationTags = null
 let activeView = 'load'
 
 const switchView = name => {
@@ -42,7 +43,7 @@ const switchView = name => {
 relationIdInput.addEventListener('input', e => {
     const match = relationIdInput.value.match(/\d+/)
     e.target.value = match !== null ? match[0] : ''
-});
+})
 
 loadRelationForm.addEventListener('submit', e => {
     e.preventDefault()
@@ -119,12 +120,14 @@ export const processFetchRelationData = data => {
 }
 
 export const processRelationTags = data => {
+    relationTags = data.tags
+
     const dummyDiv = document.createElement('div')
 
     if (data.nameOrRef)
         dummyDiv.appendChild(createElementFromHTML(`<tr><td colspan="2">${data.nameOrRef}</td></tr>`))
 
-    const interestingTags = ['fixme', 'note', 'from', 'via', 'to', 'network', 'operator']
+    const interestingTags = ['fixme', 'note', 'from', 'via', 'to', 'network', 'operator', 'roundtrip']
 
     for (const tag of interestingTags)
         if (data.tags[tag])

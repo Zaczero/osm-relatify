@@ -64,6 +64,15 @@ def _check_for_not_enough_bus_stops(route: FinalRoute) -> FinalRouteWarning | No
     return None
 
 
+def _check_for_roundtrip_not_roundtrip(route: FinalRoute) -> FinalRouteWarning | None:
+    if route.roundtrip and route.latLngs and route.latLngs[0] != route.latLngs[-1]:
+        return FinalRouteWarning(
+            severity=WarningSeverity.LOW,
+            message='The route is not a valid roundtrip')
+
+    return None
+
+
 def _check_for_members_unchanged(route: FinalRoute, relation_members: list[RelationMember]) -> FinalRouteWarning | None:
     for route_member, relation_member in zip_longest(route.members, relation_members):
         if route_member != relation_member:
@@ -81,6 +90,7 @@ def check_for_issues(route: FinalRoute, ways: dict[ElementId, FetchRelationEleme
         _check_for_bus_stop_far_away(route, bus_stop_collections),
         _check_for_bus_stop_not_reached(route, bus_stop_collections),
         _check_for_not_enough_bus_stops(route),
+        _check_for_roundtrip_not_roundtrip(route),
         _check_for_members_unchanged(route, relation_members)]
 
     sorted_warnings = tuple(sorted(filter(None, warnings), key=lambda warning: warning.severity.value[1], reverse=True))
