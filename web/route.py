@@ -5,7 +5,7 @@ from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
 from itertools import chain
-from typing import NamedTuple, Self, Union
+from typing import NamedTuple, Self, Sequence, Union
 
 from models.element_id import ElementId
 from models.fetch_relation import (FetchRelationBusStopCollection,
@@ -34,7 +34,6 @@ class GraphValue(NamedTuple):
 
 class StackElement(NamedTuple):
     path: tuple[GraphKey, ...]
-    visited: dict[GraphKey, int]
     visited_bus_stops: dict[ElementId, int]
     almost_visited_bus_stops: dict[ElementId, int]
     intersection_bus_stops_snapshot: dict[int, tuple[GraphKey, int]]
@@ -232,25 +231,21 @@ def angle_between_ways(latLngs1: list[tuple[float, float]], latLngs2: list[tuple
     return angle
 
 
-def select_neighbors(way: FetchRelationElement, neighbors: list[GraphKey], ways: dict[ElementId, FetchRelationElement], visited: set[GraphKey]) -> list[tuple[GraphKey, float]]:
-    new_neighbors = [
-        neighbor for neighbor in neighbors
-        if visited.get(neighbor, 0) < VISITED_LIMIT]
+def select_neighbors(way: FetchRelationElement, neighbors: list[GraphKey], ways: dict[ElementId, FetchRelationElement]) -> Sequence[tuple[GraphKey, float]]:
+    if not neighbors:
+        return tuple()
+    elif len(neighbors) == 1:
+        return ((neighbors[0], 0),)
 
-    if not new_neighbors:
-        return []
-    elif len(new_neighbors) == 1:
-        return [(new_neighbors[0], 0)]
-
-    angles = [
+    angles = (
         (angle_between_ways(way.latLngs, ways[neighbor.way_id].latLngs), neighbor)
-        for neighbor in new_neighbors]
+        for neighbor in neighbors)
 
     # the angle difference from the straight path
     # TODO: support 0-180 range by utilizing is_start
-    angle_differences = [
+    angle_differences = tuple(
         (neighbor, 90 - abs(90 - angle))
-        for angle, neighbor in angles]
+        for angle, neighbor in angles)
 
     return angle_differences
 
@@ -306,33 +301,33 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
 
             current_way = ways[current_key.way_id]
             neighbors = graph[exit_at_key].connected_to
-            valid_neighbors = select_neighbors(current_way, neighbors, ways, s.visited)
+            valid_neighbors = select_neighbors(current_way, neighbors, ways)
 
             intersection_id = graph[exit_at_key].intersection_id
 
             if (t := s.intersection_bus_stops_snapshot.get(intersection_id, None)) is not None:
-                intersection_entered_at, intersection_bus_stops_count = t
+                intersection_bus_stops_count, intersection_visit_count = t
             else:
-                intersection_entered_at = None
                 intersection_bus_stops_count = None
+                intersection_visit_count = 0
 
-            if intersection_entered_at is None or intersection_bus_stops_count < len(s.visited_bus_stops) + len(s.almost_visited_bus_stops):
-                new_intersection_bus_stops_snapshot_changed = True
-                new_intersection_bus_stops_snapshot = s.intersection_bus_stops_snapshot.copy()
+            new_intersection_bus_stops_snapshot = s.intersection_bus_stops_snapshot.copy()
+
+            if intersection_bus_stops_count is None or intersection_bus_stops_count < len(s.visited_bus_stops) + len(s.almost_visited_bus_stops):
+                new_intersection_visit_count = 1
                 new_intersection_bus_stops_snapshot[intersection_id] = (
-                    exit_at_key, len(s.visited_bus_stops) + len(s.almost_visited_bus_stops))
+                    len(s.visited_bus_stops) + len(s.almost_visited_bus_stops), new_intersection_visit_count)
+            elif intersection_visit_count < VISITED_LIMIT:
+                new_intersection_visit_count = intersection_visit_count + 1
+                new_intersection_bus_stops_snapshot[intersection_id] = (
+                    intersection_bus_stops_count, new_intersection_visit_count)
             else:
-                new_intersection_bus_stops_snapshot_changed = False
-                new_intersection_bus_stops_snapshot = s.intersection_bus_stops_snapshot
+                continue
 
             for neighbor, neighbor_angle in valid_neighbors:
                 neighbor_way = ways[neighbor.way_id]
 
                 new_path = s.path + (neighbor,)
-                new_visited = s.visited.copy()
-
-                new_neighbor_visited = new_visited.get(neighbor, 0) + 1
-                new_visited[neighbor] = new_neighbor_visited
 
                 visited_bus_stops, almost_visited_bus_stops = get_bus_stops_at(neighbor, id_sorted_bus_map)
 
@@ -354,11 +349,6 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
                     new_visited_bus_stops = s.visited_bus_stops
                     new_almost_visited_bus_stops = s.almost_visited_bus_stops
 
-                if not new_intersection_bus_stops_snapshot_changed and len(neighbors) > 1:
-                    # allow only going back if there are no new bus stops (to prevent useless loops)
-                    if neighbor != intersection_entered_at:
-                        continue
-
                 new_length = s.length + neighbor_way.length
 
                 if neighbor_way.id not in s.complete_path:
@@ -375,7 +365,7 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
                 else:
                     new_angle_sum = s.angle_sum + neighbor_angle
 
-                if new_neighbor_visited > 1 and new_neighbor_visited >= s.visited[current_key]:
+                if new_intersection_visit_count > 1:
                     new_loop_length = s.loop_length + neighbor_way.length
                 else:
                     new_loop_length = 0
@@ -407,7 +397,6 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
 
                 stack.append(StackElement(
                     path=new_path,
-                    visited=new_visited,
                     visited_bus_stops=new_visited_bus_stops,
                     almost_visited_bus_stops=new_almost_visited_bus_stops,
                     intersection_bus_stops_snapshot=new_intersection_bus_stops_snapshot,
@@ -434,11 +423,10 @@ async def modified_dfs(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, 
 
         return StackElement(
             path=(key,),
-            visited={key: 1},
             visited_bus_stops={b.bus_stop_collection.best.id: 1 for b in visited_bus_stops},
             almost_visited_bus_stops={b.bus_stop_collection.best.id: 1 for b in almost_visited_bus_stops},
             intersection_bus_stops_snapshot={
-                intersection_id: (key, len(visited_bus_stops) + len(almost_visited_bus_stops))},
+                intersection_id: (len(visited_bus_stops) + len(almost_visited_bus_stops), 1)},
             length=ways[start_way].length,
             complete_path={key.way_id},
             complete_length=ways[start_way].length)
