@@ -2,7 +2,7 @@ import re
 import time
 from contextlib import contextmanager
 from math import atan2, cos, radians, sin, sqrt
-from typing import Generator
+from typing import Generator, Sequence
 
 import httpx
 from numba import njit
@@ -53,7 +53,8 @@ def normalize_name(name: str, *, lower: bool = False, number: bool = False, spec
         name = name.lower()
 
     if number:
-        name = re.sub(r'(^|\D)0+', r'\1', name)
+        name = re.sub(r'\b(\d\d)\b', r'0\1', name)
+        name = re.sub(r'\b(\d)\b', r'00\1', name)
 
     if special:
         name = re.sub(r'[^\w\s]', '', name)
@@ -62,6 +63,10 @@ def normalize_name(name: str, *, lower: bool = False, number: bool = False, spec
         name = re.sub(r'\s+', ' ', name).strip()
 
     return name
+
+
+def extract_numbers(text: str) -> set[int]:
+    return {int(n) for n in re.findall(r'\d+', text)}
 
 
 @njit(fastmath=True)

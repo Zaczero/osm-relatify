@@ -23,6 +23,7 @@ starlette = "*"
 tenacity = "*"
 uvicorn = {extras = ["standard"], version = "*"}
 xmltodict = "*"
+rapidfuzz = "*"
 
 [dev-packages]
 autopep8 = "*"

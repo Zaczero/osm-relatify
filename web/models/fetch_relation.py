@@ -77,6 +77,10 @@ class FetchRelationBusStop:
     def typed_id(self) -> tuple[str, ElementId]:
         return self.type, self.id
 
+    @property
+    def nice_id(self) -> str:
+        return f'{self.type}/{self.id}'
+
     @classmethod
     def from_data(cls, data: dict) -> Self:
         name: str = data['tags'].get('name', '').strip()
@@ -109,6 +113,7 @@ class FetchRelationBusStop:
 
 @dataclass(frozen=True, kw_only=True, slots=True)
 class FetchRelationBusStopCollection:
+    name: str
     platform: FetchRelationBusStop | None
     stop: FetchRelationBusStop | None
 
