@@ -70,46 +70,41 @@ class BestPath(NamedTuple):
             complete_length=0,
             angle_sum=0)
 
-    def select_best(self, other: Self, ways: dict[ElementId, FetchRelationElement]) -> Self:
-        # avoid floating point errors, also, ignore small differences, length is in meters
+    def select_best(self, other: Self) -> Self:
         complete_length_diff = other.complete_length - self.complete_length
-        if abs(complete_length_diff) < 0.1:
+        if abs(complete_length_diff) < 0.1:  # avoid floating point errors
             complete_length_diff = 0
-
-        length_diff = other.length - self.length
-        if abs(length_diff) < 0.1:
-            length_diff = 0
-
-        bus_stops_count_diff = other.bus_stops_count - self.bus_stops_count
-        almost_bus_stops_count_diff = other.almost_bus_stops_count - self.almost_bus_stops_count
-        ignore_bus_stops_count = False
-
-        if bus_stops_count_diff and bus_stops_count_diff + almost_bus_stops_count_diff == 0:
-            max_convert_distance = MAX_EXTRA_DISTANCE_TO_CONVERT * bus_stops_count_diff
-
-            if length_diff < max_convert_distance < 0:
-                ignore_bus_stops_count = True
-                # pprint((max_convert_distance, length_diff))
-            if 0 < max_convert_distance < length_diff:
-                ignore_bus_stops_count = True
-                # pprint((max_convert_distance, length_diff))
-
-        if not ignore_bus_stops_count:
-            # more bus stops
-            if bus_stops_count_diff > 0:
-                return other
-            if bus_stops_count_diff < 0:
-                return self
-
-            if almost_bus_stops_count_diff > 0:
-                return other
-            if almost_bus_stops_count_diff < 0:
-                return self
 
         # more complete
         if complete_length_diff > 0:
             return other
         if complete_length_diff < 0:
+            return self
+
+        length_diff = other.length - self.length
+        if abs(length_diff) < 0.1:  # avoid floating point errors
+            length_diff = 0
+
+        bus_stops_count_diff = other.bus_stops_count - self.bus_stops_count
+        almost_bus_stops_count_diff = other.almost_bus_stops_count - self.almost_bus_stops_count
+
+        if bus_stops_count_diff and bus_stops_count_diff + almost_bus_stops_count_diff == 0:
+            max_convert_distance = MAX_EXTRA_DISTANCE_TO_CONVERT * bus_stops_count_diff
+
+            if length_diff < max_convert_distance < 0:
+                return other
+            if 0 < max_convert_distance < length_diff:
+                return self
+
+        # more bus stops
+        if bus_stops_count_diff > 0:
+            return other
+        if bus_stops_count_diff < 0:
+            return self
+
+        if almost_bus_stops_count_diff > 0:
+            return other
+        if almost_bus_stops_count_diff < 0:
             return self
 
         # shorter path
@@ -124,8 +119,7 @@ class BestPath(NamedTuple):
         if self.angle_sum < other.angle_sum:
             return self
 
-        # paths are equal
-        return self
+        return self  # paths are equal
 
 
 class BestPathCollection(NamedTuple):
@@ -134,8 +128,8 @@ class BestPathCollection(NamedTuple):
 
     def merge(self, other: Self, ways: dict[ElementId, FetchRelationElement]) -> Self:
         return BestPathCollection(
-            invalid=self.invalid.select_best(other.invalid, ways),
-            valid=self.valid.select_best(other.valid, ways))
+            invalid=self.invalid.select_best(other.invalid),
+            valid=self.valid.select_best(other.valid))
 
 
 def get_way_endpoints(latLngs: list[tuple[float, float]]) -> tuple[tuple[float, float], tuple[float, float]]:
@@ -305,10 +299,10 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
                 angle_sum=s.angle_sum)
 
             if current_key.way_id == end_way:
-                if (replace := best_path.valid.select_best(current_best_path, ways)) == current_best_path:
+                if (replace := best_path.valid.select_best(current_best_path)) == current_best_path:
                     best_path = best_path._replace(valid=replace)
             else:
-                if (replace := best_path.invalid.select_best(current_best_path, ways)) == current_best_path:
+                if (replace := best_path.invalid.select_best(current_best_path)) == current_best_path:
                     best_path = best_path._replace(invalid=replace)
 
             current_way = ways[current_key.way_id]
