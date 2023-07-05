@@ -5,6 +5,7 @@ from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
 from itertools import chain
+from pprint import pprint
 from typing import NamedTuple, Self, Sequence, Union
 
 from models.element_id import ElementId
@@ -20,6 +21,7 @@ BOOL_END = False
 VISITED_LIMIT = 2
 MAX_LOOP_LENGTH = 1000
 MAX_AFTER_FINISH_LENGTH = 1000
+MAX_EXTRA_DISTANCE_TO_CONVERT = 1000
 
 
 class GraphKey(NamedTuple):
@@ -69,36 +71,46 @@ class BestPath(NamedTuple):
             angle_sum=0)
 
     def select_best(self, other: Self, ways: dict[ElementId, FetchRelationElement]) -> Self:
-        # more bus stops
-        if self.bus_stops_count < other.bus_stops_count:
-            return other
-        if self.bus_stops_count > other.bus_stops_count:
-            return self
-
-        if self.almost_bus_stops_count < other.almost_bus_stops_count:
-            return other
-        if self.almost_bus_stops_count > other.almost_bus_stops_count:
-            return self
-
+        # avoid floating point errors, also, ignore small differences, length is in meters
         complete_length_diff = other.complete_length - self.complete_length
-
-        # avoid floating point errors, also, ignore small differences
-        # length is in meters
         if abs(complete_length_diff) < 0.1:
             complete_length_diff = 0
+
+        length_diff = other.length - self.length
+        if abs(length_diff) < 0.1:
+            length_diff = 0
+
+        bus_stops_count_diff = other.bus_stops_count - self.bus_stops_count
+        almost_bus_stops_count_diff = other.almost_bus_stops_count - self.almost_bus_stops_count
+        ignore_bus_stops_count = False
+
+        if bus_stops_count_diff and bus_stops_count_diff + almost_bus_stops_count_diff == 0:
+            max_convert_distance = MAX_EXTRA_DISTANCE_TO_CONVERT * bus_stops_count_diff
+
+            if length_diff < max_convert_distance < 0:
+                ignore_bus_stops_count = True
+                # pprint((max_convert_distance, length_diff))
+            if 0 < max_convert_distance < length_diff:
+                ignore_bus_stops_count = True
+                # pprint((max_convert_distance, length_diff))
+
+        if not ignore_bus_stops_count:
+            # more bus stops
+            if bus_stops_count_diff > 0:
+                return other
+            if bus_stops_count_diff < 0:
+                return self
+
+            if almost_bus_stops_count_diff > 0:
+                return other
+            if almost_bus_stops_count_diff < 0:
+                return self
 
         # more complete
         if complete_length_diff > 0:
             return other
         if complete_length_diff < 0:
             return self
-
-        length_diff = other.length - self.length
-
-        # avoid floating point errors, also, ignore small differences
-        # length is in meters
-        if abs(length_diff) < 0.1:
-            length_diff = 0
 
         # shorter path
         if length_diff < 0:
