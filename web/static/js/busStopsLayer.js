@@ -1,5 +1,6 @@
 import { clearBusStopsPopup, showContextMenu } from './busStopsContext.js'
 import { map } from './map.js'
+import { getBusCollectionName } from './utils.js'
 import { waysRBush } from './waysLayer.js'
 import { requestCalcBusRoute } from './waysRoute.js'
 
@@ -71,10 +72,12 @@ export function updateBusStopsVisibility() {
         return
 
     for (const [i, busStopCollection] of busStopData.entries()) {
+        const name = getBusCollectionName(busStopCollection)
+
         if (busStopCollection.platform)
-            addBusStopToLayer(i, busStopCollection.platform, 'platform')
+            addBusStopToLayer(i, busStopCollection.platform, name, 'platform')
         else if (busStopCollection.stop)
-            addBusStopToLayer(i, busStopCollection.stop, 'stop')
+            addBusStopToLayer(i, busStopCollection.stop, name, 'stop')
     }
 }
 
@@ -99,7 +102,7 @@ function createBusStopIcon(iconUrl, size) {
     })
 }
 
-function addBusStopToLayer(i, stop, role) {
+function addBusStopToLayer(i, stop, name, role) {
     if (!stop.member) {
         const nearby = waysRBush.search({
             minX: stop.latLng[0],
@@ -119,7 +122,7 @@ function addBusStopToLayer(i, stop, role) {
         opacity: stop.member ? 1 : 0.8
     }).addTo(addToLayer)
 
-    marker.bindTooltip(stop.name || '<i>Unnamed</i>', {
+    marker.bindTooltip(name, {
         direction: 'top',
         offset: [0, -10],
     })

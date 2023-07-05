@@ -2,7 +2,7 @@ import { processBusStopData } from './busStopsLayer.js'
 import { downloadHistoryData, processRelationDownloadTriggers } from './downloadTriggers.js'
 import { map } from './map.js'
 import { showMessage } from './messageBox.js'
-import { createElementFromHTML, deflateCompress } from './utils.js'
+import { createElementFromHTML, deflateCompress, getBusCollectionName } from './utils.js'
 import { processRelationEndpointData } from './waysEndpoint.js'
 import { processRelationWaysData, removeMembersList, waysData } from './waysLayer.js'
 import { routeData } from './waysRoute.js'
@@ -273,14 +273,13 @@ export const processRouteStops = data => {
     routeSummary.innerHTML = ''
 
     for (const collection of data.busStops) {
-        const name = collection.platform ? collection.platform.name : collection.stop.name
         const isPlatform = collection.platform != null
         const isStop = collection.stop != null
 
         routeSummary.appendChild(createElementFromHTML(`
         <div class="route-summary-item">
             <img class="stop-icon" src="/static/img/bus_stop.webp" alt="Bus stop icon" height="28">
-            <div class="stop-name">${styleStopName(name)}</div>
+            <div class="stop-name">${styleStopName(getBusCollectionName(collection))}</div>
             <div class="stop-info">
                 ${isPlatform
                 ? `<a class="stop-info-platform link-underline link-underline-opacity-0 link-underline-opacity-100-hover"

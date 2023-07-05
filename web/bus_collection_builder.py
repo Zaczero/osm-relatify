@@ -111,6 +111,7 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
     for area_group in area_groups.values():
         # group by name in area
         name_groups: dict[str, list[FetchRelationBusStop]] = defaultdict(list)
+
         for bus_stop in area_group:
             name_groups[bus_stop.groupName].append(bus_stop)
 
@@ -118,37 +119,35 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
         if len(name_groups) > 1:
             name_groups.pop('', None)
 
-        # expand non-number suffixed groups to number suffixed groups if needed
-        prefix_map = defaultdict(list)
+        # expand short-name groups to long-name groups if possible
+        expand_keys = sorted(name_groups, key=len, reverse=True)
 
-        for name_group_key, name_group in name_groups.items():
-            parts = name_group_key.split(' ')
+        for i, expand_key in enumerate(expand_keys[1:], 1):
+            expand_group = name_groups[expand_key]
+            expand_group_public_transports = {bus_stop.public_transport for bus_stop in expand_group}
+            expanded = False
+            target_keys = (key for key in expand_keys[:i] if expand_key in key)
 
-            if len(parts) > 1 and parts[-1].isdecimal():
-                parts.pop()
-                prefix_map[' '.join(parts)].append(name_group_key)
+            for target_key in target_keys:
+                target_group = name_groups.get(target_key)
 
-        for prefix, name_group_keys in prefix_map.items():
-            if (prefix_name_group := name_groups.get(prefix)) is None:
-                continue
+                # skip if target_group was expanded/popped
+                if not target_group:
+                    continue
 
-            success = False
+                target_group_public_transports = (bus_stop.public_transport for bus_stop in target_group)
 
-            for name_group_key in name_group_keys:
-                name_group = name_groups[name_group_key]
+                # expand only if target doesn't share any public_transport types
+                if not expand_group_public_transports.intersection(target_group_public_transports):
+                    # print(f'[COLL] Expanded {expand_key!r} to {target_key!r}')
+                    target_group.extend(expand_group)
+                    expanded = True
 
-                for prefix_bus_stop in prefix_name_group:
-                    if not any(
-                            bus_stop.public_transport == prefix_bus_stop.public_transport
-                            for bus_stop in name_group):
-                        name_group.append(prefix_bus_stop)
-                        success = True
-
-            if success:
-                name_groups.pop(prefix)
+            if expanded:
+                name_groups.pop(expand_key)
 
         # for each named group, pick best platform and best stop
-        for name_group_key, name_group in name_groups.items():
+        for name_key, name_group in name_groups.items():
             platforms: list[FetchRelationBusStop] = []
             stops: list[FetchRelationBusStop] = []
 
@@ -168,7 +167,7 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
             stops_explicit, stops_implicit = _pick_best(stops)
 
             if platforms_explicit and stops_explicit:
-                print(f'🚧 Warning: Unexpected explicit platforms and stops for {name_group_key}')
+                print(f'🚧 Warning: Unexpected explicit platforms and stops for {name_key!r}')
 
             if platforms_explicit:
                 for platform, stop in zip(platforms_explicit, _assign(platforms_explicit, stops, element_reuse=True)):

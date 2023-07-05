@@ -90,7 +90,11 @@ class FetchRelationBusStop:
             ' '.join((name, local_ref)),
             whitespace=True)
 
-        group_name = normalize_name(name, lower=True, number=True)
+        group_name = normalize_name(
+            name,
+            lower=True,
+            special=True,
+            number=True)
 
         return cls(
             id=ElementId(data['id']),
