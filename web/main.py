@@ -2,6 +2,7 @@ import asyncio
 import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, replace
+from itertools import chain
 from pprint import pprint
 from typing import Optional
 
@@ -184,7 +185,9 @@ async def post_query(model: PostQueryModel, user: dict = Depends(require_user_de
         download_targets = tuple(from_dict(Cell, t, Config(cast=[], strict=True)) for t in model.downloadTargets)
 
         if model.reload:
-            download_hist = replace(download_hist, session=DownloadHistory.make_session())
+            download_hist = replace(download_hist,
+                                    session=DownloadHistory.make_session(),
+                                    history=(tuple(chain.from_iterable(download_hist.history)),))
     else:
         download_hist = None
         download_targets = None
