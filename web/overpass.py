@@ -130,6 +130,10 @@ def is_road(tags: dict[str, str]) -> bool:
         'bus_guideway',
     }
 
+    highway_designated_valid = tags['highway'] in {
+        'pedestrian',
+    }
+
     service_valid = tags.get('service', 'no') not in {
         'driveway',
         'driveway2',
@@ -168,7 +172,7 @@ def is_road(tags: dict[str, str]) -> bool:
         }
 
     return all((
-        highway_valid,
+        (highway_valid or (highway_designated_valid and access_designated)),
         (service_valid or access_designated),
         access_valid,
         noarea_valid))
