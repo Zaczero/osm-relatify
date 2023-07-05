@@ -65,14 +65,14 @@ def build_bus_query(cell_bbs: Sequence[BoundingBox], cell_bbs_expanded: Sequence
         f'>;' \
         f'out skel qt;' \
         f'out count;' + \
-        f'(' + \
         ''.join(
             f'node[highway=bus_stop][public_transport=platform]({bb});'
+            f'out tags center qt;'
             f'nwr[highway=platform][public_transport=platform]({bb});'
+            f'out tags center qt;'
             f'node[public_transport=stop_position]({bb});'
+            f'out tags center qt;'
             for bb in cell_bbs_expanded) + \
-        f');' \
-        f'out tags center qt;' \
         f'out count;' \
         f'(' + \
         ''.join(
@@ -81,16 +81,14 @@ def build_bus_query(cell_bbs: Sequence[BoundingBox], cell_bbs_expanded: Sequence
         f')->.r;' \
         f'.r out body qt;' \
         f'.r out count;' \
-        f'(' \
         f'node(r.r:platform);' \
+        f'out tags center qt;' \
         f'way(r.r:platform);' \
+        f'out tags center qt;' \
         f'rel(r.r:platform);' \
-        f');' \
         f'out tags center qt;' \
         f'out count;' \
-        f'(' \
         f'node(r.r:stop);' \
-        f');' \
         f'out tags center qt;' \
         f'out count;'
 
