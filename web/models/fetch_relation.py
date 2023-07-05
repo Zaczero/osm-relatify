@@ -79,9 +79,15 @@ class FetchRelationBusStop:
 
     @classmethod
     def from_data(cls, data: dict) -> Self:
-        name = normalize_name(' '.join((
-            data['tags'].get('name', ''),
-            data['tags'].get('local_ref', ''))),
+        name: str = data['tags'].get('name', '').strip()
+        local_ref: str = data['tags'].get('local_ref', '').strip()
+
+        # ignore local_ref if it's already part of the name
+        if name and local_ref and name.endswith(local_ref):
+            local_ref = ''
+
+        name = normalize_name(
+            ' '.join((name, local_ref)),
             whitespace=True)
 
         group_name = normalize_name(name, lower=True, number=True)
@@ -211,6 +217,7 @@ def assign_none_members(bus_stop_collections: list[FetchRelationBusStopCollectio
                 break
 
     # 2 pass: assign stop as a member for stop w/o platform
+    # reason: platform and stop may be miss-matched and belong to different collections
     for member in relation['members']:
         typed_id = (member['type'], ElementId(member['ref']))
 
