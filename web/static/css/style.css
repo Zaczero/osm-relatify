@@ -164,7 +164,7 @@
   font-weight: bold;
 }
 
-.route-summary-item:hover {
+.route-summary-item:hover .stop-name {
   text-decoration: underline;
 }
 
@@ -174,6 +174,28 @@
 
 .route-summary-item .stop-icon {
   margin-right: .5em;
+}
+
+.route-summary-item .stop-info {
+  font-family: monospace;
+  font-weight: bold;
+  margin-left: auto;
+}
+
+.route-summary-item .stop-info >:first-child {
+  margin-left: .4em;
+}
+
+.route-summary-item .stop-info > *{
+  padding: 0 .1em;
+}
+
+.route-summary-item .stop-info-platform {
+  color: #22a;
+}
+
+.route-summary-item .stop-info-stop {
+  color: #2a2;
 }
 
 .digit {

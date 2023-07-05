@@ -274,11 +274,27 @@ export const processRouteStops = data => {
 
     for (const collection of data.busStops) {
         const name = collection.platform ? collection.platform.name : collection.stop.name
+        const isPlatform = collection.platform != null
+        const isStop = collection.stop != null
 
         routeSummary.appendChild(createElementFromHTML(`
         <div class="route-summary-item">
             <img class="stop-icon" src="/static/img/bus_stop.webp" alt="Bus stop icon" height="28">
             <div class="stop-name">${styleStopName(name)}</div>
+            <div class="stop-info">
+                ${isPlatform
+                ? `<a class="stop-info-platform link-underline link-underline-opacity-0 link-underline-opacity-100-hover"
+                    title="This stop has a platform"
+                    href="https://www.openstreetmap.org/${collection.platform.type}/${collection.platform.id}"
+                    target="_blank">P</a>`
+                : ''}<!--
+                -->${isStop
+                ? `<a class="stop-info-stop link-underline link-underline-opacity-0 link-underline-opacity-100-hover"
+                    title="This stop has a stopping position"
+                    href="https://www.openstreetmap.org/${collection.stop.type}/${collection.stop.id}"
+                    target="_blank">S</a>`
+                : ''}
+            </div>
         </div>`))
     }
 
@@ -286,7 +302,12 @@ export const processRouteStops = data => {
     const allIcons = allItems.map(item => item.querySelector('.stop-icon'))
 
     for (const [index, item] of allItems.entries()) {
-        item.onclick = () => {
+        item.onclick = e => {
+            e.stopPropagation()
+
+            if (e.target.tagName == 'A')
+                return
+
             allItems.forEach((item, i) => {
                 const icon = allIcons[i]
                 if (i <= index) {
