@@ -2,7 +2,7 @@ import re
 import time
 from contextlib import contextmanager
 from math import atan2, cos, radians, sin, sqrt
-from typing import Generator, Sequence
+from typing import Generator
 
 import httpx
 from numba import njit
@@ -36,7 +36,6 @@ def get_http_client(base_url: str = '', *, auth: tuple | None = None, headers: d
         base_url=base_url,
         follow_redirects=True,
         timeout=30,
-        limits=httpx.Limits(max_connections=8, max_keepalive_connections=2, keepalive_expiry=30),
         auth=auth,
         headers=headers)
 

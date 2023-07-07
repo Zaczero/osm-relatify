@@ -4,11 +4,10 @@ from typing import Iterable
 import httpx
 import xmltodict
 from asyncache import cached
-from authlib.integrations.httpx_client import OAuth1Auth
+from authlib.integrations.httpx_client import OAuth2Auth
 from cachetools import TTLCache
 
-from config import (CHANGESET_ID_PLACEHOLDER, CONSUMER_KEY, CONSUMER_SECRET,
-                    TAG_MAX_LENGTH)
+from config import CHANGESET_ID_PLACEHOLDER, TAG_MAX_LENGTH
 from utils import ensure_list, get_http_client
 
 
@@ -21,16 +20,9 @@ class UploadResult:
 
 
 class OpenStreetMap:
-    def __init__(self, *,
-                 username: str = None, password: str = None,
-                 oauth_token: str = None, oauth_token_secret: str = None):
-        if oauth_token and oauth_token_secret:
-            self.auth = OAuth1Auth(
-                client_id=CONSUMER_KEY,
-                client_secret=CONSUMER_SECRET,
-                token=oauth_token,
-                token_secret=oauth_token_secret,
-                force_include_body=True)
+    def __init__(self, *, username: str = None, password: str = None, oauth_token: dict = None):
+        if oauth_token:
+            self.auth = OAuth2Auth(oauth_token)
         elif username and password:
             self.auth = (username, password)
         else:

@@ -15,6 +15,7 @@ itsdangerous = "*"
 jinja2 = "*"
 numba = "*"
 orjson = "*"
+rapidfuzz = "*"
 requests = "*"
 rtree = "*"
 scikit-learn = "*"
@@ -23,7 +24,6 @@ starlette = "*"
 tenacity = "*"
 uvicorn = {extras = ["standard"], version = "*"}
 xmltodict = "*"
-rapidfuzz = "*"
 
 [dev-packages]
 autopep8 = "*"

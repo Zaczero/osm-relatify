@@ -1,14 +1,10 @@
 import asyncio
-import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, replace
 from itertools import chain
-from pprint import pprint
-from typing import Optional
 
 import orjson
-from authlib.integrations.starlette_client import OAuth
-from cachetools import TTLCache
+from authlib.integrations.httpx_client import AsyncOAuth2Client
 from dacite import Config, from_dict
 from fastapi import (Depends, FastAPI, HTTPException, Request, Response,
                      WebSocket, WebSocketDisconnect, status)
@@ -16,15 +12,14 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx import HTTPStatusError
-from itsdangerous import Serializer
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.websockets import WebSocketState
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from compression import deflate_compress, deflate_decompress
 from config import (CALC_ROUTE_MAX_PROCESSES, CALC_ROUTE_N_PROCESSES,
-                    CREATED_BY, SECRET, WEBSITE)
+                    CREATED_BY, OSM_CLIENT, OSM_SCOPES, OSM_SECRET, SECRET,
+                    WEBSITE)
 from deflate_middleware import DeflateRoute
 from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
@@ -40,80 +35,25 @@ from relation_builder import (build_osm_change, get_relation_members,
                               sort_and_upgrade_members)
 from route import calc_bus_route
 from route_warnings import check_for_issues
+from user_session import (fetch_user_details, require_user_details,
+                          require_user_token, set_user_token, unset_user_token)
 from utils import print_run_time
 
-oauth = OAuth()
-oauth.register(
-    name='osm',
-    client_id=os.getenv('CONSUMER_KEY'),
-    client_secret=os.getenv('CONSUMER_SECRET'),
-    request_token_url='https://www.openstreetmap.org/oauth/request_token',
-    access_token_url='https://www.openstreetmap.org/oauth/access_token',
-    authorize_url='https://www.openstreetmap.org/oauth/authorize')
+INDEX_REDIRECT = RedirectResponse('/', status_code=status.HTTP_302_FOUND)
 
 app = FastAPI(default_response_class=ORJSONResponse)
-app.add_middleware(SessionMiddleware, secret_key=SECRET)
 app.router.route_class = DeflateRoute
+app.add_middleware(SessionMiddleware, secret_key=SECRET, max_age=31536000)  # 1 year
 app.mount('/static', StaticFiles(directory='static', html=True), name='static')
 
-secret = Serializer(SECRET)
 templates = Jinja2Templates(directory='templates')
-
-user_details_cache = TTLCache(maxsize=1024, ttl=3600)  # 1 hour cache
 
 process_executor = ProcessPoolExecutor(CALC_ROUTE_MAX_PROCESSES)
 openstreetmap = OpenStreetMap()
 overpass = Overpass()
 
 
-@retry(wait=wait_exponential(), stop=stop_after_attempt(3))
-async def fetch_user_details(request: Request = None, websocket: WebSocket = None) -> Optional[dict]:
-    if request is not None:
-        cookies = request.cookies
-    elif websocket is not None:
-        cookies = websocket.cookies
-    else:
-        raise ValueError('Either request or websocket must be provided')
-
-    if 'token' not in cookies:
-        return None
-
-    try:
-        token = secret.loads(cookies['token'])
-    except Exception:
-        return None
-
-    user_cache_key = token['oauth_token_secret']
-
-    try:
-        return user_details_cache[user_cache_key]
-    except Exception:
-        response = await oauth.osm.get('https://api.openstreetmap.org/api/0.6/user/details.json', token=token)
-
-        if response.status_code != 200:
-            return None
-
-        try:
-            user = response.json()['user']
-        except Exception:
-            return None
-
-        if 'img' not in user:
-            user['img'] = {'href': None}
-
-        user_details_cache[user_cache_key] = user
-        return user
-
-
-async def require_user_details(user=Depends(fetch_user_details)) -> dict:
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-
-    return user
-
-
 @app.get('/')
-@app.post('/')
 async def index(request: Request, user=Depends(fetch_user_details)):
     if user is not None:
         return templates.TemplateResponse('authorized.jinja2', {'request': request, 'user': user})
@@ -122,29 +62,38 @@ async def index(request: Request, user=Depends(fetch_user_details)):
 
 
 @app.post('/login')
-async def login(request: Request):
-    return await oauth.osm.authorize_redirect(request, str(request.url_for('callback')))
+async def login(request: Request) -> RedirectResponse:
+    async with AsyncOAuth2Client(
+            client_id=OSM_CLIENT,
+            scope=OSM_SCOPES,
+            redirect_uri=str(request.url_for('callback'))) as oauth:
+        authorization_url, state = oauth.create_authorization_url('https://www.openstreetmap.org/oauth2/authorize')
+
+    request.session['oauth_state'] = state
+    return RedirectResponse(authorization_url, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get('/callback')
-async def callback(request: Request):
-    token = await oauth.osm.authorize_access_token(request)
+async def callback(request: Request) -> RedirectResponse:
+    state = request.session.pop('oauth_state', None)
 
-    response = RedirectResponse(request.url_for('index'))
-    response.set_cookie('token', secret.dumps(token),
-                        max_age=(365 * 24 * 3600),
-                        secure=request.url.scheme == 'https',
-                        httponly=True)
+    if state is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Invalid OAuth state')
 
-    return response
+    async with AsyncOAuth2Client(
+            client_id=OSM_CLIENT,
+            client_secret=OSM_SECRET,
+            redirect_uri=str(request.url_for('callback')),
+            state=state) as oauth:
+        token = await oauth.fetch_token('https://www.openstreetmap.org/oauth2/token', authorization_response=str(request.url))
+
+    set_user_token(request, token)
+    return INDEX_REDIRECT
 
 
 @app.post('/logout')
-async def logout(request: Request):
-    response = RedirectResponse(request.url_for('index'))
-    response.set_cookie('token', '', max_age=0)
-
-    return response
+def logout(_=Depends(unset_user_token)) -> RedirectResponse:
+    return INDEX_REDIRECT
 
 
 def get_route_type(tags: dict[str, str]) -> str | None:
@@ -176,7 +125,7 @@ class PostQueryModel(BaseModel):
 
 
 @app.post('/query')
-async def post_query(model: PostQueryModel, user: dict = Depends(require_user_details)) -> FetchRelation:
+async def post_query(model: PostQueryModel, _=Depends(require_user_details)):
     print(f'🔍 Querying relation ({model.relationId})')
     assert (model.downloadHistory is None) == (model.downloadTargets is None)
 
@@ -242,7 +191,7 @@ class PostCalcBusRouteModel:
 
 
 @app.websocket('/ws/calc_bus_route')
-async def post_calc_bus_route(ws: WebSocket, user: dict = Depends(require_user_details)):
+async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
     await ws.accept()
 
     try:
@@ -325,7 +274,7 @@ class PostDownloadOsmChangeModel(BaseModel):
 
 
 @app.post('/download_osm_change')
-async def post_download_osm_change(model: PostDownloadOsmChangeModel, user=Depends(require_user_details)):
+async def post_download_osm_change(model: PostDownloadOsmChangeModel, _=Depends(require_user_details)):
     print(f'💾 Downloading OSM change ({model.relationId})')
 
     route = from_dict(FinalRoute, model.route,
@@ -338,7 +287,7 @@ async def post_download_osm_change(model: PostDownloadOsmChangeModel, user=Depen
 
 
 @app.post('/upload_osm')
-async def post_upload_osm(request: Request, model: PostDownloadOsmChangeModel, user=Depends(require_user_details)) -> UploadResult:
+async def post_upload_osm(model: PostDownloadOsmChangeModel, token=Depends(require_user_token)) -> UploadResult:
     print(f'🌐 Uploading OSM change ({model.relationId})')
 
     route = from_dict(FinalRoute, model.route,
@@ -347,11 +296,7 @@ async def post_upload_osm(request: Request, model: PostDownloadOsmChangeModel, u
     with print_run_time('Building OSM change'):
         osm_change = await build_osm_change(model.relationId, route, include_changeset_id=True, overpass=overpass, osm=openstreetmap)
 
-    token = secret.loads(request.cookies['token'])
-    oauth_token = token['oauth_token']
-    oauth_token_secret = token['oauth_token_secret']
-
-    openstreetmap_auth = OpenStreetMap(oauth_token=oauth_token, oauth_token_secret=oauth_token_secret)
+    openstreetmap_auth = OpenStreetMap(oauth_token=token)
     openstreetmap_user = await openstreetmap_auth.get_authorized_user()
     user_edits = openstreetmap_user['changesets']['count']
 

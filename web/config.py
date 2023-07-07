@@ -19,12 +19,13 @@ OVERPASS_API_INTERPRETER = os.getenv('OVERPASS_API_INTERPRETER', 'https://overpa
 
 TAG_MAX_LENGTH = 255
 
-CONSUMER_KEY = os.getenv('CONSUMER_KEY', None)
-CONSUMER_SECRET = os.getenv('CONSUMER_SECRET', None)
+OSM_CLIENT = os.getenv('OSM_CLIENT', None)
+OSM_SECRET = os.getenv('OSM_SECRET', None)
+OSM_SCOPES = 'read_prefs write_api'
 
-if not CONSUMER_KEY or not CONSUMER_SECRET:
+if not OSM_CLIENT or not OSM_SECRET:
     print('🚧 Warning: '
-          'Environment variables CONSUMER_KEY and/or CONSUMER_SECRET are not set. '
+          'Environment variables OSM_CLIENT and/or OSM_SECRET are not set. '
           'You will not be able to authenticate with OpenStreetMap.')
 
 CPU_COUNT = len(os.sched_getaffinity(0))
