@@ -4,8 +4,8 @@ import math
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
+from functools import partial
 from itertools import chain
-from pprint import pprint
 from typing import NamedTuple, Self, Sequence, Union
 
 from models.element_id import ElementId
@@ -22,6 +22,7 @@ VISITED_LIMIT = 2
 MAX_LOOP_LENGTH = 1000
 MAX_AFTER_FINISH_LENGTH = 1000
 MAX_EXTRA_DISTANCE_TO_CONVERT = 1000
+MAX_PATH_LENGTH_FACTOR = 2.2
 
 
 class GraphKey(NamedTuple):
@@ -275,7 +276,7 @@ def get_bus_stops_at(neighbor: GraphKey, id_sorted_bus_map: dict[ElementId, list
     return visited, almost_visited
 
 
-def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, FetchRelationElement], end_way: ElementId, id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]], stack: list[StackElement], best_path: BestPathCollection, max_iter: int) -> tuple[list[StackElement], BestPathCollection]:
+def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, FetchRelationElement], end_way: ElementId, id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]], stack: list[StackElement], best_path: BestPathCollection, max_length: float, max_iter: int) -> tuple[list[StackElement], BestPathCollection]:
     message_ref = [f'Worker with {len(stack)} stack size']
 
     with print_run_time(message_ref):
@@ -357,6 +358,9 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
 
                 new_length = s.length + neighbor_way.length
 
+                if new_length > max_length:
+                    continue
+
                 if neighbor_way.id not in s.complete_path:
                     new_complete_path = s.complete_path.copy()
                     new_complete_path.add(neighbor_way.id)
@@ -420,6 +424,8 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
 
 
 async def modified_dfs(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, FetchRelationElement], start_way: ElementId, end_way: ElementId, id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]], executor: ProcessPoolExecutor, n_processes: int) -> BestPath:
+    max_length = MAX_PATH_LENGTH_FACTOR * sum(w.length for w in ways.values())
+
     start_start_key = GraphKey(start_way, BOOL_START)
     start_end_key = GraphKey(start_way, BOOL_END)
 
@@ -452,6 +458,7 @@ async def modified_dfs(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, 
 
     # run a few iterations synchronously to get a head start
     stack, best_path = modified_dfs_worker(graph, ways, end_way, id_sorted_bus_map, stack, best_path,
+                                           max_length=max_length,
                                            max_iter=sync_max_iter)
 
     tasks = []
@@ -461,8 +468,10 @@ async def modified_dfs(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, 
 
         return await loop.run_in_executor(
             executor,
-            modified_dfs_worker,
-            graph, ways, end_way, id_sorted_bus_map, stack_slice, best_path, max_iter)
+            partial(modified_dfs_worker,
+                    graph, ways, end_way, id_sorted_bus_map, stack_slice, best_path,
+                    max_length=max_length,
+                    max_iter=max_iter))
 
     while stack or tasks:
         stack_slices_len_target = n_processes - len(tasks)
