@@ -47,7 +47,7 @@ export function requestCalcBusRoute() {
 }
 
 const minReconnectInterval = 200
-const maxReconnectInterval = 2000
+const maxReconnectInterval = 3000
 const reconnectIntervalMultiplier = 2
 let reconnectInterval = minReconnectInterval
 
