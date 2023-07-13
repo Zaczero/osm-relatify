@@ -1,4 +1,4 @@
-import { map, openInOpenStreetMap } from './map.js'
+import { map, openInOpenStreetMap, openInJosm } from './map.js'
 import { requestCalcBusRoute } from './waysRoute.js'
 
 let startMarker = null
@@ -109,6 +109,10 @@ export function showContextMenu(e, way) {
                     <img class="mb-1" src="/static/img/openstreetmap.svg" width="24" alt="OpenStreetMap logo">
                     <div>Inspect</div>
                 </button>
+                <button class="btn btn-sm btn-light d-flex flex-column align-items-center" id="ep-open-josm">
+                    <img class="mb-1" src="/static/img/josm.svg" width="24" alt="Josm logo">
+                    <div>Inspect</div>
+                </button>
             </div>`,
         closeButton: false,
         className: 'popup-sm'
@@ -117,6 +121,7 @@ export function showContextMenu(e, way) {
     const setStartButton = document.getElementById('ep-set-start')
     const setStopButton = document.getElementById('ep-set-stop')
     const openOsmButton = document.getElementById('ep-open-osm')
+    const openJosmButton = document.getElementById('ep-open-josm')
 
     setStartButton.onclick = () => {
         setStartMarker(way)
@@ -131,6 +136,12 @@ export function showContextMenu(e, way) {
     openOsmButton.onclick = () => {
         const id = way.id.split('_')[0]
         openInOpenStreetMap(`way/${id}`)
+        popup.close()
+    }
+
+    openJosmButton.onclick = () => {
+        const id = way.id.split('_')[0]
+        openInJosm(`way${id}`)
         popup.close()
     }
 }
