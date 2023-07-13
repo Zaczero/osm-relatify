@@ -38,21 +38,28 @@ def _check_for_end_not_reached(route: FinalRoute, end_way: ElementId) -> FinalRo
 def _check_for_bus_stop_far_away(route: FinalRoute, bus_stop_collections: list[FetchRelationBusStopCollection]) -> FinalRouteWarning | None:
     threshold = 120  # meters
     sorted_ways = (route_way.way for route_way in route.ways)
+    sorted_bus_stops = sort_bus_on_path(bus_stop_collections, sorted_ways)
+    far_way_bus_stops = tuple(stop for stop in sorted_bus_stops if stop.distance_from_neighbor > threshold)
 
-    for sorted_bus in sort_bus_on_path(bus_stop_collections, sorted_ways):
-        if sorted_bus.distance_from_neighbor > threshold:
-            return FinalRouteWarning(
-                severity=WarningSeverity.LOW,
-                message='Some stops are far away')
+    if far_way_bus_stops:
+        return FinalRouteWarning(
+            severity=WarningSeverity.LOW,
+            message='Some stops are far away',
+            extra=tuple(stop.bus_stop_collection.best.id for stop in far_way_bus_stops))
 
     return None
 
 
 def _check_for_bus_stop_not_reached(route: FinalRoute, bus_stop_collections: list[FetchRelationBusStopCollection]) -> FinalRouteWarning | None:
     if len(route.busStops) != len(bus_stop_collections):
+        route_bus_stop_ids = set(map(lambda collection: collection.best.id, route.busStops))
+        relation_bus_stop_ids = set(map(lambda collection: collection.best.id, bus_stop_collections))
+        not_reached_bus_stop_ids = relation_bus_stop_ids - route_bus_stop_ids
+
         return FinalRouteWarning(
             severity=WarningSeverity.HIGH,
-            message='Some stops are not reached')
+            message='Some stops are not reached',
+            extra=tuple(not_reached_bus_stop_ids))
 
 
 def _check_for_not_enough_bus_stops(route: FinalRoute) -> FinalRouteWarning | None:

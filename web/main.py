@@ -19,7 +19,7 @@ from starlette.websockets import WebSocketState
 from compression import deflate_compress, deflate_decompress
 from config import (CALC_ROUTE_MAX_PROCESSES, CALC_ROUTE_N_PROCESSES,
                     CREATED_BY, OSM_CLIENT, OSM_SCOPES, OSM_SECRET, SECRET,
-                    WEBSITE)
+                    USER_AGENT, WEBSITE)
 from deflate_middleware import DeflateRoute
 from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
@@ -84,7 +84,10 @@ async def callback(request: Request) -> RedirectResponse:
             client_id=OSM_CLIENT,
             client_secret=OSM_SECRET,
             redirect_uri=str(request.url_for('callback')),
-            state=state) as oauth:
+            state=state,
+            headers={
+                'User-Agent': USER_AGENT,
+            }) as oauth:
         token = await oauth.fetch_token('https://www.openstreetmap.org/oauth2/token', authorization_response=str(request.url))
 
     set_user_token(request, token)

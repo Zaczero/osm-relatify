@@ -1,4 +1,4 @@
-import { processBusStopData } from './busStopsLayer.js'
+import { busStopData, processBusStopData } from './busStopsLayer.js'
 import { downloadHistoryData, processRelationDownloadTriggers } from './downloadTriggers.js'
 import { map } from './map.js'
 import { showMessage } from './messageBox.js'
@@ -161,13 +161,39 @@ export const processRouteWarnings = data => {
 
             child.querySelector('button.primary').onclick = () => {
                 // show me
-                const way = waysData[warning.extra[0]]
+                const wayId = warning.extra[0]
+                const way = waysData[wayId]
                 map.setView(way.midpoint, 19)
             }
 
             child.querySelector('button.secondary').onclick = () => {
                 // deselect all
                 removeMembersList(warning.extra)
+            }
+
+            editWarnings.appendChild(child)
+        }
+        else if (warning.message == 'Some stops are far away' || warning.message == 'Some stops are not reached') {
+            const child = createElementFromHTML(`
+            <div class="warning warning-${severity_text}">
+                <div class="warning-message">${warning.message}</div>
+                <div class="btn-group-vertical ms-2">
+                    <button class="btn primary btn-primary">Show me</button>
+                </div>
+            </div>`)
+
+            child.querySelector('button.primary').onclick = () => {
+                // show me
+                const stopId = warning.extra[0]
+                const stop = busStopData.find(c =>
+                    (c.platform && c.platform.id == stopId) ||
+                    (c.stop && c.stop.id == stopId))
+
+                if (stop)
+                    if (stop.platform)
+                        map.setView(stop.platform.latLng, 19)
+                    else
+                        map.setView(stop.stop.latLng, 19)
             }
 
             editWarnings.appendChild(child)
