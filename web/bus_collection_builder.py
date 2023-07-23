@@ -5,6 +5,7 @@ from operator import itemgetter
 from pprint import pprint
 from typing import Generator, Sequence
 
+import networkx as nx
 import numpy as np
 from rapidfuzz.fuzz import token_ratio
 from rapidfuzz.process import extract
@@ -88,7 +89,7 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
     bus_stops_coordinates = tuple(radians_tuple(bus_stop.latLng) for bus_stop in bus_stops)
     bus_stops_tree = BallTree(bus_stops_coordinates, metric='haversine')
 
-    areas: dict[int, int] = {}
+    G = nx.Graph()
 
     query_indices, _ = bus_stops_tree.query_radius(
         bus_stops_coordinates,
@@ -99,20 +100,14 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
     # group by area
     for i, indices in enumerate(query_indices):
         for j in indices[1:]:
-            if (j_in := areas.get(j)) is not None:
-                areas[i] = j_in
-                break
-        else:
-            areas[i] = i
-
-    area_groups: dict[int, list[FetchRelationBusStop]] = defaultdict(list)
-
-    for member_index, area_index in areas.items():
-        area_groups[area_index].append(bus_stops[member_index])
+            G.add_edge(i, j)
 
     collections: list[FetchRelationBusStopCollection] = []
 
-    for area_group in area_groups.values():
+    for component in nx.connected_components(G):
+        # make area group from member indices
+        area_group = tuple(bus_stops[member_index] for member_index in component)
+
         # group by name in area
         name_groups: dict[str, list[FetchRelationBusStop]] = defaultdict(list)
 
