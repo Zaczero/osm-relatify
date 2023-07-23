@@ -136,7 +136,6 @@ def is_road(tags: dict[str, str]) -> bool:
 
     service_valid = tags.get('service', 'no') not in {
         'driveway',
-        'driveway2',
         'parking_aisle',
         'alley',
         'emergency_access',
