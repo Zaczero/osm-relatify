@@ -1,5 +1,5 @@
 from collections import defaultdict
-from itertools import repeat
+from itertools import combinations, repeat
 from math import radians
 from operator import itemgetter
 from pprint import pprint
@@ -98,8 +98,10 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
         sort_results=True)
 
     # group by area
-    for i, indices in enumerate(query_indices):
-        for j in indices[1:]:
+    for i in range(len(bus_stops)):
+        G.add_edge(i, i)
+    for query_group in query_indices:
+        for i, j in combinations(query_group, 2):
             G.add_edge(i, j)
 
     collections: list[FetchRelationBusStopCollection] = []
