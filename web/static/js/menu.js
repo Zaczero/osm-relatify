@@ -281,18 +281,9 @@ editSubmitBtn.onclick = () => {
 }
 
 const styleStopName = name => {
-    let styledName = ''
-
-    for (let i = 0; i < name.length; i++) {
-        const char = name.charAt(i)
-
-        if (char >= '0' && char <= '9')
-            styledName += `<span class="digit digit-${char}">${char}</span>`
-        else
-            styledName += char
-    }
-
-    return styledName
+    return name.replace(/^(?:\d+)|(?:\d+)$/, match => {
+        return match.split('').map(d => `<span class="digit digit-${d}">${d}</span>`).join('')
+    })
 }
 
 export const processRouteStops = data => {

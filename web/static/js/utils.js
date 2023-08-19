@@ -109,7 +109,7 @@ export const getBusCollectionName = collection => {
         let result = ''
 
         if (stop.tags.ref)
-            result += `<i>${stop.tags.ref}</i> `
+            result += `<small><i>${stop.tags.ref}</i></small> `
 
         return (result + stop.name).trim()
     }
