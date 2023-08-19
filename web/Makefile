@@ -4,6 +4,8 @@ update:
 	docker push $$(docker load < $$(nix-build --no-out-link) | sed -En 's/Loaded image: (\S+)/\1/p')
 
 bundle:
+	chmod +w static/js static/css templates
+
 # menu.js
 	HASH=$$(esbuild static/js/menu.js --bundle --minify | sha256sum | head -c8 ; echo '') && \
 	esbuild static/js/menu.js --bundle --minify --sourcemap --charset=utf8 --outfile=static/js/menu.$$HASH.js && \
