@@ -170,8 +170,6 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
 
         # for each named group, pick best platform and best stop
         for name_key, name_group in name_groups.items():
-            collection_name = next(s.name for s in name_group if s.groupName == name_key)
-
             platforms: list[FetchRelationBusStop] = []
             stops: list[FetchRelationBusStop] = []
 
@@ -191,13 +189,13 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
             stops_explicit, stops_implicit = _pick_best(stops)
 
             if platforms_explicit and stops_explicit:
+                collection_name = next(s.name for s in name_group if s.groupName == name_key)
                 print(f'🚧 Warning: Invalid explicit platforms and stops for {collection_name!r}, '
                       f'ID={stops_explicit[0].nice_id!r}')
 
             if platforms_explicit:
                 for platform, stop in zip(platforms_explicit, _assign(platforms_explicit, stops, element_reuse=True)):
                     collections.append(FetchRelationBusStopCollection(
-                        name=collection_name,
                         platform=platform,
                         stop=stop))
 
@@ -206,7 +204,6 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
             if stops_explicit:
                 for stop, platform in zip(stops_explicit, _assign(stops_explicit, platforms, element_reuse=False)):
                     collections.append(FetchRelationBusStopCollection(
-                        name=collection_name,
                         platform=platform,
                         stop=stop))
 
@@ -215,7 +212,6 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
             if platforms_implicit and stops_implicit:
                 for platform, stop in zip(platforms_implicit, _assign(platforms_implicit, stops, element_reuse=True)):
                     collections.append(FetchRelationBusStopCollection(
-                        name=collection_name,
                         platform=platform,
                         stop=stop))
 
@@ -224,7 +220,6 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
             if platforms_implicit:  # and not stops_implicit
                 for platform in platforms_implicit:
                     collections.append(FetchRelationBusStopCollection(
-                        name=collection_name,
                         platform=platform,
                         stop=None))
 
@@ -233,7 +228,6 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
             if stops_implicit:  # and not platforms_implicit
                 for stop in stops_implicit:
                     collections.append(FetchRelationBusStopCollection(
-                        name=collection_name,
                         platform=None,
                         stop=stop))
 

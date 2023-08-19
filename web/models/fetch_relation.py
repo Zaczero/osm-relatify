@@ -68,6 +68,7 @@ class FetchRelationBusStop:
     type: str
     member: bool | None
     latLng: tuple[float, float]
+    tags: dict[str, str]
     name: str
     groupName: str
     highway: str | None
@@ -105,6 +106,7 @@ class FetchRelationBusStop:
             type=data['type'],
             member=None,
             latLng=(data['lat'], data['lon']),
+            tags=data['tags'],
             name=name,
             groupName=group_name,
             highway=data['tags'].get('highway', None),
@@ -113,7 +115,6 @@ class FetchRelationBusStop:
 
 @dataclass(frozen=True, kw_only=True, slots=True)
 class FetchRelationBusStopCollection:
-    name: str
     platform: FetchRelationBusStop | None
     stop: FetchRelationBusStop | None
 

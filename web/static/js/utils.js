@@ -102,5 +102,20 @@ export const deflateDecompress = async data => {
 }
 
 export const getBusCollectionName = collection => {
-    return collection.name || '<i>Unnamed</i>'
+    const displayName = stop => {
+        if (!stop)
+            return ''
+
+        let result = ''
+
+        if (stop.tags.ref)
+            result += `<i>${stop.tags.ref}</i> `
+
+        return (result + stop.name).trim()
+    }
+
+    const platformName = displayName(collection.platform)
+    const stopName = displayName(collection.stop)
+    const longestDisplayName = platformName.length >= stopName.length ? platformName : stopName
+    return longestDisplayName || '<i>Unnamed</i>'
 }
