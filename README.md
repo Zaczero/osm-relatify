@@ -19,6 +19,10 @@ The application relies on the OSM data to be (more-or-less) accurately tagged. I
 
 Please note that, for now, OSM Relatify only supports bus relations.
 
+## User documentation
+
+https://wiki.openstreetmap.org/wiki/Relatify
+
 ## Features
 
 ### Supported
