@@ -144,7 +144,9 @@ def is_road(tags: dict[str, str]) -> bool:
     access_designated = False
     access_valid = True
 
-    if 'bus' in tags:
+    if 'bus:conditional' in tags:
+        access_designated = access_valid = True
+    elif 'bus' in tags:
         access_designated = access_valid = tags['bus'] not in {
             'no'
         }
