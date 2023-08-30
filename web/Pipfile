@@ -6,6 +6,7 @@ verify_ssl = true
 [packages]
 asyncache = "*"
 authlib = "*"
+brotlipy = "*"
 cachetools = "*"
 dacite = "*"
 fastapi = "*"
