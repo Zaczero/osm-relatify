@@ -117,8 +117,12 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
             name_groups[bus_stop.groupName].append(bus_stop)
 
         # discard unnamed if in area with named
-        if len(name_groups) > 1:
-            name_groups.pop('', None)
+        if len(name_groups) > 1 and (unnamed := name_groups.get('', None)):
+            unnamed = [s for s in unnamed if s.public_transport == PublicTransport.PLATFORM]  # never discard platforms
+            if unnamed:
+                name_groups[''] = unnamed
+            else:
+                name_groups.pop('')
 
         # expand short-name groups to long-name groups if possible
         if len(name_groups) > 1:
