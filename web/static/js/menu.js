@@ -40,6 +40,8 @@ const switchView = name => {
     activeView = name
 }
 
+relationIdInput.focus()
+
 relationIdInput.addEventListener('input', e => {
     const match = relationIdInput.value.match(/\d+/)
     e.target.value = match !== null ? match[0] : ''
