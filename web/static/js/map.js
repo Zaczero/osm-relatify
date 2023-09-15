@@ -15,6 +15,10 @@ function getInitialMapView() {
 
 const [defaultLat, defaultLng, defaultZoom] = getInitialMapView()
 
+export const canvasRenderer = L.canvas({
+    padding: 0,
+})
+
 export const map = L.map('map', {
     center: [defaultLat, defaultLng],
     zoom: defaultZoom,

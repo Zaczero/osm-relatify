@@ -1,6 +1,6 @@
 import { updateBusStopsVisibility } from './busStopsLayer.js'
 import { downloadTrigger } from './downloadTriggers.js'
-import { map } from './map.js'
+import { canvasRenderer, map } from './map.js'
 import { showContextMenu, startWay, stopWay } from './waysEndpoint.js'
 import { requestCalcBusRoute } from './waysRoute.js'
 
@@ -133,18 +133,21 @@ const addWay = way => {
     const lineWeight = way.member ? 7 : 5
 
     const line = L.polyline(way.latLngs, {
+        renderer: canvasRenderer,
         color: lineColor,
         weight: lineWeight,
         pane: way.member ? 'memberWays' : 'nonMemberWays',
     })
 
     const buffer = L.polyline(way.latLngs, {
+        renderer: canvasRenderer,
         color: 'transparent',
         weight: lineWeight + 18,
         pane: way.member ? 'memberBuffers' : 'nonMemberBuffers',
     })
 
     const buffer2 = L.polyline(way.latLngs, {
+        renderer: canvasRenderer,
         color: 'transparent',
         weight: lineWeight + 9,
         pane: way.member ? 'memberBuffers2' : 'nonMemberBuffers2',
