@@ -274,6 +274,28 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
 class PostDownloadOsmChangeModel(BaseModel):
     relationId: int
     route: dict
+    tags: dict[str, str] = None  # TODO: required
+
+    def make_comment(self) -> str:
+        # TODO: remove
+        if self.tags is None:
+            self.tags = {}
+
+        tags_name = self.tags.get('name')
+        tags_ref = self.tags.get('ref')
+
+        # only include ref if it's not already in the name
+        if tags_ref and tags_ref in tags_name:
+            tags_ref = None
+
+        if tags_name and tags_ref:
+            return f'Updated bus route: {tags_ref} {tags_name}, #{self.relationId}'
+        elif tags_name:
+            return f'Updated bus route: {tags_name}, #{self.relationId}'
+        elif tags_ref:
+            return f'Updated bus route: {tags_ref}, #{self.relationId}'
+        else:
+            return f'Updated bus route #{self.relationId}'
 
 
 @app.post('/download_osm_change')
@@ -305,7 +327,7 @@ async def post_upload_osm(model: PostDownloadOsmChangeModel, token=Depends(requi
 
     upload_result = await openstreetmap_auth.upload_osm_change(osm_change, {
         'changesets_count': user_edits + 1,
-        'comment': f'Updated bus route #{model.relationId}',
+        'comment':  model.make_comment(),
         'created_by': CREATED_BY,
         'website': WEBSITE,
     })

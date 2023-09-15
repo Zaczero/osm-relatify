@@ -353,7 +353,8 @@ submitUploadBtn.onclick = async () => {
         },
         body: await deflateCompress({
             relationId: relationId,
-            route: routeData
+            route: routeData,
+            tags: relationTags
         })
     })
         .then(async resp => {
@@ -414,7 +415,8 @@ submitDownloadBtn.onclick = async () => {
         },
         body: await deflateCompress({
             relationId: relationId,
-            route: routeData
+            route: routeData,
+            tags: relationTags
         })
     })
         .then(async resp => {
