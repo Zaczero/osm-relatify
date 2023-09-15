@@ -281,8 +281,8 @@ class PostDownloadOsmChangeModel(BaseModel):
         if self.tags is None:
             self.tags = {}
 
-        tags_name = self.tags.get('name')
-        tags_ref = self.tags.get('ref')
+        tags_name = self.tags.get('name', '')
+        tags_ref = self.tags.get('ref', '')
 
         # only include ref if it's not already in the name
         if tags_ref and tags_ref in tags_name:
