@@ -274,13 +274,9 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
 class PostDownloadOsmChangeModel(BaseModel):
     relationId: int
     route: dict
-    tags: dict[str, str] = None  # TODO: required
+    tags: dict[str, str]
 
     def make_comment(self) -> str:
-        # TODO: remove
-        if self.tags is None:
-            self.tags = {}
-
         tags_name = self.tags.get('name', '')
         tags_ref = self.tags.get('ref', '')
 
