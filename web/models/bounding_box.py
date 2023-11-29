@@ -4,7 +4,6 @@ from typing import Self
 
 from config import DOWNLOAD_RELATION_GRID_SIZE
 from models.download_history import Cell
-from utils import EARTH_RADIUS
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,8 +18,9 @@ class BoundingBox:
 
     def extend(self, unit_meters: float = None, *, unit_degrees: float = None) -> Self:
         if unit_meters is not None:
-            lat_delta = degrees(unit_meters / EARTH_RADIUS)
-            lng_delta = degrees(unit_meters / (EARTH_RADIUS * cos(radians(self.minlat))))
+            R = 6_371_000  # earth radius
+            lat_delta = degrees(unit_meters / R)
+            lng_delta = degrees(unit_meters / (R * cos(radians(self.minlat))))
         elif unit_degrees is not None:
             lat_delta = unit_degrees
             lng_delta = unit_degrees

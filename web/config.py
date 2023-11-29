@@ -9,7 +9,7 @@ if not SECRET:
 
 WEBSITE = os.getenv('WEBSITE', 'https://github.com/Zaczero/osm-relatify')
 
-VERSION = '1.2'
+VERSION = '1.2.1'
 CREATED_BY = f'osm-relatify {VERSION}'
 USER_AGENT = f'osm-relatify/{VERSION} (+https://github.com/Zaczero/osm-relatify)'
 
@@ -24,9 +24,11 @@ OSM_SECRET = os.getenv('OSM_SECRET', None)
 OSM_SCOPES = 'read_prefs write_api'
 
 if not OSM_CLIENT or not OSM_SECRET:
-    print('🚧 Warning: '
-          'Environment variables OSM_CLIENT and/or OSM_SECRET are not set. '
-          'You will not be able to authenticate with OpenStreetMap.')
+    print(
+        '🚧 Warning: '
+        'Environment variables OSM_CLIENT and/or OSM_SECRET are not set. '
+        'You will not be able to authenticate with OpenStreetMap.'
+    )
 
 CPU_COUNT = len(os.sched_getaffinity(0))
 CALC_ROUTE_MAX_REQUESTS = 3

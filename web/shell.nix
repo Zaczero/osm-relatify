@@ -1,4 +1,6 @@
-{ pkgs ? import <nixpkgs> { }
+{ pkgsnix ? import ./pkgs.nix
+, pkgs ? pkgsnix.pkgs
+, unstable ? pkgsnix.unstable
 , isDocker ? false
 }:
 
@@ -10,9 +12,9 @@ with pkgs; let
 
   devBuildInputs = [
     gnumake
-    gnused
     pipenv
     esbuild
+    unstable.ruff
   ];
 
   commonShellHook = ''
@@ -22,6 +24,8 @@ with pkgs; let
     export LD_LIBRARY_PATH="${lib.makeLibraryPath commonBuildInputs}"
     export PIPENV_VENV_IN_PROJECT=1
     export PIPENV_VERBOSITY=-1
+    export PYTHONPATH="$(pwd)"
+    [ ! -e .venv/bin/python ] && [ -h .venv/bin/python ] && rm -r .venv
     [ ! -f .venv/bin/activate ] && pipenv sync --dev
     case $- in *i*) exec pipenv shell --fancy;; esac
   '';

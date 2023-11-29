@@ -1,4 +1,3 @@
-import enum
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from enum import Enum
@@ -7,7 +6,8 @@ from typing import Self
 from models.bounding_box import BoundingBox
 from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
-from utils import haversine_distance, normalize_name
+from utils import normalize_name
+from cython_lib.utils import haversine_distance
 
 
 def _interpolate_coords(latLng1: tuple[float, float], latLng2: tuple[float, float], ratio: float) -> tuple[float, float]:

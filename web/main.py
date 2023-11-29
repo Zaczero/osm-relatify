@@ -8,7 +8,7 @@ from authlib.integrations.httpx_client import AsyncOAuth2Client
 from dacite import Config, from_dict
 from fastapi import (Depends, FastAPI, HTTPException, Request, Response,
                      WebSocket, WebSocketDisconnect, status)
-from fastapi.responses import RedirectResponse
+from fastapi.responses import ORJSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx import HTTPStatusError
@@ -29,11 +29,10 @@ from models.fetch_relation import (FetchRelation,
                                    assign_none_members, find_start_stop_ways)
 from models.final_route import FinalRoute, WarningSeverity
 from openstreetmap import OpenStreetMap, UploadResult
-from orjson_response import ORJSONResponse
 from overpass import Overpass
 from relation_builder import (build_osm_change, get_relation_members,
                               sort_and_upgrade_members)
-from route import calc_bus_route
+from cython_lib.route import calc_bus_route
 from route_warnings import check_for_issues
 from user_session import (fetch_user_details, require_user_details,
                           require_user_token, set_user_token, unset_user_token)

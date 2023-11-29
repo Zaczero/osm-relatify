@@ -1,19 +1,34 @@
 import asyncio
-import itertools
-import math
-from collections import defaultdict
+from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
 from functools import partial
 from itertools import chain
-from typing import NamedTuple, Self, Sequence, Union
+from typing import NamedTuple, Self
 
+import cython
+
+from cython_lib.utils import haversine_distance
 from models.element_id import ElementId
-from models.fetch_relation import (FetchRelationBusStopCollection,
-                                   FetchRelationElement)
+from models.fetch_relation import FetchRelationBusStopCollection, FetchRelationElement
 from models.final_route import FinalRoute, FinalRouteWay
 from relation_builder import SortedBusEntry, sort_bus_on_path
-from utils import haversine_distance, print_run_time
+from utils import print_run_time
+
+if cython.compiled:
+    from cython.cimports.libc.math import acos, pi
+
+    print('Cython: 🐇 compiled')
+else:
+    from math import acos, pi
+
+    print('Cython: 🐌 not compiled')
+
+
+@cython.cfunc
+def _degrees(x: cython.double) -> cython.double:
+    return x * (180 / pi)
+
 
 BOOL_START = True
 BOOL_END = False
@@ -69,10 +84,11 @@ class BestPath(NamedTuple):
             length=0,
             complete_path=set(),
             complete_length=0,
-            angle_sum=0)
+            angle_sum=0,
+        )
 
     def select_best(self, other: Self) -> Self:
-        complete_length_diff = other.complete_length - self.complete_length
+        complete_length_diff: cython.double = other.complete_length - self.complete_length
         if abs(complete_length_diff) < 0.1:  # avoid floating point errors
             complete_length_diff = 0
 
@@ -82,15 +98,15 @@ class BestPath(NamedTuple):
         if complete_length_diff < 0:
             return self
 
-        length_diff = other.length - self.length
+        length_diff: cython.double = other.length - self.length
         if abs(length_diff) < 0.1:  # avoid floating point errors
             length_diff = 0
 
-        bus_stops_count_diff = other.bus_stops_count - self.bus_stops_count
-        almost_bus_stops_count_diff = other.almost_bus_stops_count - self.almost_bus_stops_count
+        bus_stops_count_diff: cython.int = other.bus_stops_count - self.bus_stops_count
+        almost_bus_stops_count_diff: cython.int = other.almost_bus_stops_count - self.almost_bus_stops_count
 
         if bus_stops_count_diff and bus_stops_count_diff + almost_bus_stops_count_diff == 0:
-            max_convert_distance = MAX_EXTRA_DISTANCE_TO_CONVERT * bus_stops_count_diff
+            max_convert_distance: cython.int = MAX_EXTRA_DISTANCE_TO_CONVERT * bus_stops_count_diff
 
             if length_diff < max_convert_distance < 0:
                 return other
@@ -130,24 +146,27 @@ class BestPathCollection(NamedTuple):
     def merge(self, other: Self, ways: dict[ElementId, FetchRelationElement]) -> Self:
         return BestPathCollection(
             invalid=self.invalid.select_best(other.invalid),
-            valid=self.valid.select_best(other.valid))
+            valid=self.valid.select_best(other.valid),
+        )
 
 
-def get_way_endpoints(latLngs: list[tuple[float, float]]) -> tuple[tuple[float, float], tuple[float, float]]:
-    return latLngs[0], latLngs[-1]
+def get_way_endpoints(
+    latlons: Sequence[tuple[cython.double, cython.double]]
+) -> tuple[tuple[cython.double, cython.double], tuple[cython.double, cython.double]]:
+    return latlons[0], latlons[-1]
 
 
 def build_graph(ways: dict[ElementId, FetchRelationElement]) -> dict[GraphKey, GraphValue]:
-    graph: dict[GraphKey, Union[list[GraphKey], GraphValue]] = {}
+    graph: dict[GraphKey, list[GraphKey] | GraphValue] = {}
 
     for way_id, way in ways.items():
         start, end = get_way_endpoints(way.latLngs)
         start_key, stop_key = (way_id, BOOL_START), (way_id, BOOL_END)
 
-        def get_neighbors_at(latLng: tuple[float, float]) -> list[GraphKey]:
+        def get_neighbors_at(latlon: tuple[cython.double, cython.double]) -> list[GraphKey]:
             neighbors = []
 
-            for connected_way_id in way.connectedTo:
+            for connected_way_id in way.connectedTo:  # noqa: B023
                 connected_way = ways.get(connected_way_id, None)
 
                 # skip non-member ways
@@ -156,9 +175,9 @@ def build_graph(ways: dict[ElementId, FetchRelationElement]) -> dict[GraphKey, G
 
                 connected_start, connected_end = get_way_endpoints(connected_way.latLngs)
 
-                if latLng == connected_start:
+                if latlon == connected_start:
                     neighbors.append(GraphKey(connected_way_id, BOOL_START))
-                elif latLng == connected_end and not connected_way.oneway:
+                elif latlon == connected_end and not connected_way.oneway:
                     neighbors.append(GraphKey(connected_way_id, BOOL_END))
                 else:
                     # connected via other endpoint
@@ -170,10 +189,10 @@ def build_graph(ways: dict[ElementId, FetchRelationElement]) -> dict[GraphKey, G
         graph[stop_key] = get_neighbors_at(end)
 
     convert_keys = set(graph.keys())
+    intersection_num: cython.int = -1
 
-    for intersection_num in itertools.count():
-        if not convert_keys:
-            break
+    while convert_keys:
+        intersection_num += 1
 
         key = convert_keys.pop()
         neighbors = graph[key]
@@ -191,73 +210,91 @@ def build_graph(ways: dict[ElementId, FetchRelationElement]) -> dict[GraphKey, G
     return graph
 
 
-def angle_between_ways(latLngs1: list[tuple[float, float]], latLngs2: list[tuple[float, float]]) -> float:
-    start1, end1 = get_way_endpoints(latLngs1)
-    start2, end2 = get_way_endpoints(latLngs2)
+def angle_between_ways(
+    latlons1: Sequence[tuple[cython.double, cython.double]],
+    latlons2: Sequence[tuple[cython.double, cython.double]],
+) -> cython.double:
+    start1, end1 = get_way_endpoints(latlons1)
+    start2, end2 = get_way_endpoints(latlons2)
 
     # consider very end segments for angle calculation
     if end1 == start2:
-        start1 = latLngs1[-2]
-        end2 = latLngs2[1]
+        start1 = latlons1[-2]
+        end2 = latlons2[1]
 
-        d12 = haversine_distance(start1, end1)
-        d23 = haversine_distance(end1, end2)
-        d13 = haversine_distance(start1, end2)
+        d12: cython.double = haversine_distance(start1, end1)
+        d23: cython.double = haversine_distance(end1, end2)
+        d13: cython.double = haversine_distance(start1, end2)
 
     elif end1 == end2:
-        start1 = latLngs1[-2]
-        start2 = latLngs2[-2]
+        start1 = latlons1[-2]
+        start2 = latlons2[-2]
 
-        d12 = haversine_distance(start1, end1)
-        d23 = haversine_distance(end1, start2)
-        d13 = haversine_distance(start1, start2)
+        d12: cython.double = haversine_distance(start1, end1)
+        d23: cython.double = haversine_distance(end1, start2)
+        d13: cython.double = haversine_distance(start1, start2)
 
     elif start1 == start2:
-        end1 = latLngs1[1]
-        end2 = latLngs2[1]
+        end1 = latlons1[1]
+        end2 = latlons2[1]
 
-        d12 = haversine_distance(start1, end1)
-        d23 = haversine_distance(end1, end2)
-        d13 = haversine_distance(start1, end2)
+        d12: cython.double = haversine_distance(start1, end1)
+        d23: cython.double = haversine_distance(end1, end2)
+        d13: cython.double = haversine_distance(start1, end2)
 
     elif start1 == end2:
-        end1 = latLngs1[1]
-        start2 = latLngs2[-2]
+        end1 = latlons1[1]
+        start2 = latlons2[-2]
 
-        d12 = haversine_distance(start1, end1)
-        d23 = haversine_distance(end1, start2)
-        d13 = haversine_distance(start1, start2)
+        d12: cython.double = haversine_distance(start1, end1)
+        d23: cython.double = haversine_distance(end1, start2)
+        d13: cython.double = haversine_distance(start1, start2)
 
     else:
         raise Exception('Ways are not connected')
 
     # law of cosines
-    cos_angle = (d12**2 + d23**2 - d13**2) / (2 * d12 * d23)
-    angle = math.degrees(math.acos(min(max(cos_angle, -1), 1)))
+    cos_angle = (d12 * d12 + d23 * d23 - d13 * d13) / (2 * d12 * d23)
+    angle = _degrees(acos(min(max(cos_angle, -1), 1)))
 
     return angle
 
 
-def select_neighbors(way: FetchRelationElement, neighbors: list[GraphKey], ways: dict[ElementId, FetchRelationElement]) -> Sequence[tuple[GraphKey, float]]:
+def select_neighbors(
+    way: FetchRelationElement,
+    neighbors: Sequence[GraphKey],
+    ways: dict[ElementId, FetchRelationElement],
+) -> Sequence[tuple[GraphKey, cython.double]]:
     if not neighbors:
-        return tuple()
+        return ()
     elif len(neighbors) == 1:
         return ((neighbors[0], 0),)
 
     angles = (
-        (angle_between_ways(way.latLngs, ways[neighbor.way_id].latLngs), neighbor)
-        for neighbor in neighbors)
+        (
+            angle_between_ways(way.latLngs, ways[neighbor.way_id].latLngs),
+            neighbor,
+        )
+        for neighbor in neighbors
+    )
 
     # the angle difference from the straight path
     # TODO: support 0-180 range by utilizing is_start
     angle_differences = tuple(
-        (neighbor, 90 - abs(90 - angle))
-        for angle, neighbor in angles)
+        (
+            neighbor,
+            90 - abs(90 - angle),
+        )
+        for angle, neighbor in angles
+    )
 
     return angle_differences
 
 
-def get_bus_stops_at(neighbor: GraphKey, id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]]) -> tuple[list[SortedBusEntry], list[SortedBusEntry]]:
+def get_bus_stops_at(
+    neighbor: GraphKey,
+    id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]],
+) -> tuple[list[SortedBusEntry], list[SortedBusEntry]]:
     neighbor_is_forward = neighbor.is_start
 
     visited = []
@@ -276,11 +313,20 @@ def get_bus_stops_at(neighbor: GraphKey, id_sorted_bus_map: dict[ElementId, list
     return visited, almost_visited
 
 
-def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, FetchRelationElement], end_way: ElementId, id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]], stack: list[StackElement], best_path: BestPathCollection, max_length: float, max_iter: int) -> tuple[list[StackElement], BestPathCollection]:
+def modified_dfs_worker(
+    graph: dict[GraphKey, GraphValue],
+    ways: dict[ElementId, FetchRelationElement],
+    end_way: ElementId,
+    id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]],
+    stack: list[StackElement],
+    best_path: BestPathCollection,
+    max_length: cython.double,
+    max_iter: cython.int,
+) -> tuple[list[StackElement], BestPathCollection]:
     message_ref = [f'Worker with {len(stack)} stack size']
 
     with print_run_time(message_ref):
-        for current_iter in range(1, max_iter + 1):
+        for current_iter in range(1, max_iter + 1):  # noqa: B007
             if not stack:
                 break
 
@@ -297,7 +343,8 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
                 length=s.length,
                 complete_path=s.complete_path,
                 complete_length=s.complete_length,
-                angle_sum=s.angle_sum)
+                angle_sum=s.angle_sum,
+            )
 
             if current_key.way_id == end_way:
                 if (replace := best_path.valid.select_best(current_best_path)) == current_best_path:
@@ -320,21 +367,27 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
 
             new_intersection_bus_stops_snapshot = s.intersection_bus_stops_snapshot.copy()
 
-            if intersection_bus_stops_count is None or intersection_bus_stops_count < len(s.visited_bus_stops) + len(s.almost_visited_bus_stops):
+            if (intersection_bus_stops_count is None) or (
+                intersection_bus_stops_count < len(s.visited_bus_stops) + len(s.almost_visited_bus_stops)
+            ):
                 new_intersection_visit_count = 1
                 new_intersection_bus_stops_snapshot[intersection_id] = (
-                    len(s.visited_bus_stops) + len(s.almost_visited_bus_stops), new_intersection_visit_count)
+                    len(s.visited_bus_stops) + len(s.almost_visited_bus_stops),
+                    new_intersection_visit_count,
+                )
             elif intersection_visit_count < VISITED_LIMIT:
                 new_intersection_visit_count = intersection_visit_count + 1
                 new_intersection_bus_stops_snapshot[intersection_id] = (
-                    intersection_bus_stops_count, new_intersection_visit_count)
+                    intersection_bus_stops_count,
+                    new_intersection_visit_count,
+                )
             else:
                 continue
 
             for neighbor, neighbor_angle in valid_neighbors:
                 neighbor_way = ways[neighbor.way_id]
 
-                new_path = s.path + (neighbor,)
+                new_path = (*s.path, neighbor)
 
                 visited_bus_stops, almost_visited_bus_stops = get_bus_stops_at(neighbor, id_sorted_bus_map)
 
@@ -349,9 +402,8 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
                         new_almost_visited_bus_stops.setdefault(b.bus_stop_collection.best.id, len(new_path))
 
                     new_almost_visited_bus_stops = {
-                        k: v
-                        for k, v in new_almost_visited_bus_stops.items()
-                        if k not in new_visited_bus_stops}
+                        k: v for k, v in new_almost_visited_bus_stops.items() if k not in new_visited_bus_stops
+                    }
                 else:
                     new_visited_bus_stops = s.visited_bus_stops
                     new_almost_visited_bus_stops = s.almost_visited_bus_stops
@@ -370,12 +422,12 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
                     new_complete_length = s.complete_length
 
                 # roundabout looping and exits are free
-                if current_way.roundabout:
+                if current_way.roundabout:  # noqa: SIM108
                     new_angle_sum = s.angle_sum
                 else:
                     new_angle_sum = s.angle_sum + neighbor_angle
 
-                if new_intersection_visit_count > 1:
+                if new_intersection_visit_count > 1:  # noqa: SIM108
                     new_loop_length = s.loop_length + neighbor_way.length
                 else:
                     new_loop_length = 0
@@ -405,25 +457,36 @@ def modified_dfs_worker(graph: dict[GraphKey, GraphValue], ways: dict[ElementId,
                 else:
                     new_roundabout_enter = None
 
-                stack.append(StackElement(
-                    path=new_path,
-                    visited_bus_stops=new_visited_bus_stops,
-                    almost_visited_bus_stops=new_almost_visited_bus_stops,
-                    intersection_bus_stops_snapshot=new_intersection_bus_stops_snapshot,
-                    length=new_length,
-                    complete_path=new_complete_path,
-                    complete_length=new_complete_length,
-                    angle_sum=new_angle_sum,
-                    loop_length=new_loop_length,
-                    after_finish_length=new_after_finish_length,
-                    roundabout_enter=new_roundabout_enter))
+                stack.append(
+                    StackElement(
+                        path=new_path,
+                        visited_bus_stops=new_visited_bus_stops,
+                        almost_visited_bus_stops=new_almost_visited_bus_stops,
+                        intersection_bus_stops_snapshot=new_intersection_bus_stops_snapshot,
+                        length=new_length,
+                        complete_path=new_complete_path,
+                        complete_length=new_complete_length,
+                        angle_sum=new_angle_sum,
+                        loop_length=new_loop_length,
+                        after_finish_length=new_after_finish_length,
+                        roundabout_enter=new_roundabout_enter,
+                    )
+                )
 
         message_ref[0] += f' and {current_iter} iterations'
 
     return stack, best_path
 
 
-async def modified_dfs(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, FetchRelationElement], start_way: ElementId, end_way: ElementId, id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]], executor: ProcessPoolExecutor, n_processes: int) -> BestPath:
+async def modified_dfs(
+    graph: dict[GraphKey, GraphValue],
+    ways: dict[ElementId, FetchRelationElement],
+    start_way: ElementId,
+    end_way: ElementId,
+    id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]],
+    executor: ProcessPoolExecutor,
+    n_processes: cython.int,
+) -> BestPath:
     max_length = MAX_PATH_LENGTH_FACTOR * sum(w.length for w in ways.values())
 
     start_start_key = GraphKey(start_way, BOOL_START)
@@ -438,18 +501,19 @@ async def modified_dfs(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, 
             visited_bus_stops={b.bus_stop_collection.best.id: 1 for b in visited_bus_stops},
             almost_visited_bus_stops={b.bus_stop_collection.best.id: 1 for b in almost_visited_bus_stops},
             intersection_bus_stops_snapshot={
-                intersection_id: (len(visited_bus_stops) + len(almost_visited_bus_stops), 1)},
+                intersection_id: (len(visited_bus_stops) + len(almost_visited_bus_stops), 1)
+            },
             length=ways[start_way].length,
             complete_path={key.way_id},
-            complete_length=ways[start_way].length)
+            complete_length=ways[start_way].length,
+        )
 
     stack: list[StackElement] = [
         init_stack_element(start_start_key),
-        init_stack_element(start_end_key)]
+        init_stack_element(start_end_key),
+    ]
 
-    best_path = BestPathCollection(
-        valid=BestPath.zero(),
-        invalid=BestPath.zero())
+    best_path = BestPathCollection(valid=BestPath.zero(), invalid=BestPath.zero())
 
     # for reference:
     # AMD Ryzen 9 5950X: 10,000 iterations in ~ 0.1s
@@ -457,21 +521,40 @@ async def modified_dfs(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, 
     async_max_iter = 10000  # .10s
 
     # run a few iterations synchronously to get a head start
-    stack, best_path = modified_dfs_worker(graph, ways, end_way, id_sorted_bus_map, stack, best_path,
-                                           max_length=max_length,
-                                           max_iter=sync_max_iter)
+    stack, best_path = modified_dfs_worker(
+        graph,
+        ways,
+        end_way,
+        id_sorted_bus_map,
+        stack,
+        best_path,
+        max_length=max_length,
+        max_iter=sync_max_iter,
+    )
 
     tasks = []
 
-    async def worker(stack_slice: list[StackElement], best_path: BestPathCollection, max_iter: int) -> tuple[list[StackElement], BestPathCollection]:
+    async def worker(
+        stack_slice: list[StackElement],
+        best_path: BestPathCollection,
+        max_iter: cython.int,
+    ) -> tuple[list[StackElement], BestPathCollection]:
         loop = asyncio.get_running_loop()
 
         return await loop.run_in_executor(
             executor,
-            partial(modified_dfs_worker,
-                    graph, ways, end_way, id_sorted_bus_map, stack_slice, best_path,
-                    max_length=max_length,
-                    max_iter=max_iter))
+            partial(
+                modified_dfs_worker,
+                graph,
+                ways,
+                end_way,
+                id_sorted_bus_map,
+                stack_slice,
+                best_path,
+                max_length=max_length,
+                max_iter=max_iter,
+            ),
+        )
 
     while stack or tasks:
         stack_slices_len_target = n_processes - len(tasks)
@@ -480,7 +563,6 @@ async def modified_dfs(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, 
 
         for i in range(stack_slices_len_target):
             current_slice_size = stack_slice_size_target + (1 if i < remainder else 0)
-
             if current_slice_size == 0:
                 break
 
@@ -491,8 +573,16 @@ async def modified_dfs(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, 
 
         print(f'[DEBUG] Stack slice sizes: {", ".join(str(len(stack_slice)) for stack_slice in stack_slices)}')
 
-        tasks.extend(asyncio.create_task(worker(stack_slice, best_path, async_max_iter))
-                     for stack_slice in stack_slices)
+        tasks.extend(
+            asyncio.create_task(
+                worker(
+                    stack_slice,
+                    best_path,
+                    async_max_iter,
+                )
+            )
+            for stack_slice in stack_slices
+        )
 
         done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
@@ -506,22 +596,29 @@ async def modified_dfs(graph: dict[GraphKey, GraphValue], ways: dict[ElementId, 
     return best_path.valid if best_path.valid.path else best_path.invalid
 
 
-def finalize_route(best_path: BestPath, ways: dict[ElementId, FetchRelationElement], bus_stop_collections: list[FetchRelationBusStopCollection], tags: dict[str, str]) -> FinalRoute:
+def finalize_route(
+    best_path: BestPath,
+    ways: dict[ElementId, FetchRelationElement],
+    bus_stop_collections: Sequence[FetchRelationBusStopCollection],
+    tags: dict[str, str],
+) -> FinalRoute:
     route_ways = tuple(
         FinalRouteWay(
             way=ways[key.way_id],
-            reversed_latLngs=not key.is_start)
-        for key in best_path.path)
+            reversed_latLngs=not key.is_start,
+        )
+        for key in best_path.path
+    )
 
-    route_latLngs_gen = (
-        route_way.way.latLngs[::-1] if route_way.reversed_latLngs else route_way.way.latLngs
-        for route_way in route_ways)
+    route_latlons_gen = (
+        route_way.way.latLngs[::-1] if route_way.reversed_latLngs else route_way.way.latLngs for route_way in route_ways
+    )
 
-    route_latLngs = tuple(chain.from_iterable(
-        latLngs if i == 0 else latLngs[1:]
-        for i, latLngs in enumerate(route_latLngs_gen)))
+    route_latlons = tuple(
+        chain.from_iterable(latlons if i == 0 else latlons[1:] for i, latlons in enumerate(route_latlons_gen))
+    )
 
-    route_latLngs_set = set(route_latLngs)
+    route_latlons_set = set(route_latlons)
 
     id_collection_map = {collection.best.id: collection for collection in bus_stop_collections}
 
@@ -530,7 +627,7 @@ def finalize_route(best_path: BestPath, ways: dict[ElementId, FetchRelationEleme
     for stop_id, _ in sorted(best_path.visited_bus_stops.items(), key=lambda x: x[1]):
         collection = id_collection_map[stop_id]
 
-        if collection.stop is not None and collection.stop.latLng not in route_latLngs_set:
+        if collection.stop is not None and collection.stop.latLng not in route_latlons_set:
             collection = replace(collection, stop=None)
 
         if collection.platform is None and collection.stop is None:
@@ -540,24 +637,41 @@ def finalize_route(best_path: BestPath, ways: dict[ElementId, FetchRelationEleme
 
     return FinalRoute(
         ways=route_ways,
-        latLngs=route_latLngs,
+        latLngs=route_latlons,
         busStops=tuple(route_bus_stops),
-        tags=tags)
+        tags=tags,
+    )
 
 
-async def calc_bus_route(ways_members: dict[ElementId, FetchRelationElement], start_way: ElementId, end_way: ElementId, bus_stop_collections: list[FetchRelationBusStopCollection], tags: dict[str, str], executor: ProcessPoolExecutor, n_processes: int) -> FinalRoute:
+async def calc_bus_route(
+    ways_members: dict[ElementId, FetchRelationElement],
+    start_way: ElementId,
+    end_way: ElementId,
+    bus_stop_collections: Sequence[FetchRelationBusStopCollection],
+    tags: dict[str, str],
+    executor: ProcessPoolExecutor,
+    n_processes: cython.int,
+) -> FinalRoute:
     with print_run_time('Sorting bus stops'):
         sorted_buses = sort_bus_on_path(bus_stop_collections, ways_members.values())
 
-    id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]] = defaultdict(list)
+    id_sorted_bus_map: dict[ElementId, list[SortedBusEntry]] = {}
 
     for sorted_bus in sorted_buses:
-        id_sorted_bus_map[sorted_bus.neighbor_id].append(sorted_bus)
+        id_sorted_bus_map.setdefault(sorted_bus.neighbor_id, []).append(sorted_bus)
 
     with print_run_time('Building graph'):
         graph = build_graph(ways_members)
 
     with print_run_time('Calculating route'):
-        best_path = await modified_dfs(graph, ways_members, start_way, end_way, id_sorted_bus_map, executor, n_processes)
+        best_path = await modified_dfs(
+            graph,
+            ways_members,
+            start_way,
+            end_way,
+            id_sorted_bus_map,
+            executor,
+            n_processes,
+        )
 
     return finalize_route(best_path, ways_members, bus_stop_collections, tags)

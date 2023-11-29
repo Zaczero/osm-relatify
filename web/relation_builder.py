@@ -6,7 +6,6 @@ from math import e
 from typing import Generator, Iterable, NamedTuple, Sequence
 
 import xmltodict
-from numba import njit
 from sklearn.neighbors import BallTree
 
 from config import CHANGESET_ID_PLACEHOLDER, CREATED_BY
@@ -17,7 +16,7 @@ from models.final_route import FinalRoute
 from models.relation_member import RelationMember
 from openstreetmap import OpenStreetMap
 from overpass import Overpass, QueryParentsResult
-from utils import EARTH_RADIUS, haversine_distance, radians_tuple
+from cython_lib.utils import haversine_distance, radians_tuple
 
 
 class SortedBusEntry(NamedTuple):
@@ -28,7 +27,6 @@ class SortedBusEntry(NamedTuple):
     right_hand_side: bool | None
 
 
-@njit(fastmath=True)
 def is_right_hand_side(latLng1: tuple[float, float], latLng2: tuple[float, float], latLngTest: tuple[float, float]) -> bool | None:
     if latLng1 == latLngTest or latLng2 == latLngTest:
         return None
@@ -40,7 +38,6 @@ def is_right_hand_side(latLng1: tuple[float, float], latLng2: tuple[float, float
     return cross_product_z > 0
 
 
-@njit(fastmath=True)
 def interpolate_latLng(latLng1_rad: tuple[float, float], latLng2_rad: tuple[float, float], threshold: float) -> list[tuple[float, float]]:
     distance = haversine_distance(latLng1_rad, latLng2_rad, unit_radians=True)
     result_size = int(distance / threshold) + 1
@@ -79,7 +76,7 @@ def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection],
     result = []
 
     for collection, collection_latLng_rad, distance, idx in zip(bus_stop_collections, collections_latLng_rad, distances, idxs):
-        distance = distance[0] * EARTH_RADIUS
+        distance = distance[0] * 6_371_000  # earth radius
         idx = idx[0]
 
         neighbor_latLng_rad = tree_coordinates_rad[idx]

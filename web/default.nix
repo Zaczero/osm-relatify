@@ -1,4 +1,7 @@
-{ pkgs ? import <nixpkgs> { } }:
+{ pkgsnix ? import ./pkgs.nix
+, pkgs ? pkgsnix.pkgs
+, unstable ? pkgsnix.unstable
+}:
 
 with pkgs; let
   shell = import ./shell.nix {
@@ -17,7 +20,7 @@ with pkgs; let
   };
 in
 dockerTools.buildLayeredImage {
-  name = "docker.monicz.pl/osm-relatify";
+  name = "docker.monicz.dev/osm-relatify";
   tag = "latest";
   maxLayers = 10;
 
@@ -29,6 +32,7 @@ dockerTools.buildLayeredImage {
     cp "${./.}"/LICENSE .
     cp "${./.}"/Makefile .
     cp "${./.}"/*.py .
+    cp -r "${./.}"/cython_lib .
     cp -r "${./.}"/models .
     cp -r "${./.}"/static .
     cp -r "${./.}"/templates .

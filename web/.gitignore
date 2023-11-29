@@ -305,3 +305,6 @@ poetry.toml
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/dotenv,python,pycharm,visualstudiocode
+
+cython_lib/*.c
+cython_lib/*.html

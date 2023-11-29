@@ -1,6 +1,12 @@
-.PHONY: update bundle version
+.PHONY: setup clean update bundle version
 
-update:
+setup:
+	python setup.py build_ext --build-lib cython_lib
+
+clean:
+	rm -rf build/ cython_lib/*{.c,.so,.html}
+
+update: setup
 	docker push $$(docker load < $$(nix-build --no-out-link) | sed -En 's/Loaded image: (\S+)/\1/p')
 
 bundle:

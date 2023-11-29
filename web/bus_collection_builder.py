@@ -13,10 +13,11 @@ from scipy.optimize import linear_sum_assignment
 from sklearn.neighbors import BallTree
 
 from config import BUS_COLLECTION_SEARCH_AREA
+from cython_lib.utils import haversine_distance, radians_tuple
 from models.fetch_relation import (FetchRelationBusStop,
                                    FetchRelationBusStopCollection,
                                    PublicTransport)
-from utils import extract_numbers, haversine_distance, radians_tuple
+from utils import extract_numbers
 
 
 def _pick_best(elements: list[FetchRelationBusStop]) -> tuple[Sequence[FetchRelationBusStop], Sequence[FetchRelationBusStop]]:

@@ -8,7 +8,7 @@ from compression import deflate_decompress
 
 class DeflateRequest(Request):
     async def body(self) -> bytes:
-        if not hasattr(self, "_body"):
+        if not hasattr(self, '_body'):
             body = await super().body()
 
             if self.headers.get('Content-Encoding') == 'deflate':
