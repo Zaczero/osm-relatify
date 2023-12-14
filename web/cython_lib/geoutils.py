@@ -3,11 +3,11 @@ import cython
 if cython.compiled:
     from cython.cimports.libc.math import atan2, cos, pi, sin, sqrt
 
-    print('Cython: 🐇 compiled')
+    print(f'{__name__}: 🐇 compiled')
 else:
     from math import atan2, cos, pi, sin, sqrt
 
-    print('Cython: 🐌 not compiled')
+    print(f'{__name__}: 🐌 not compiled')
 
 
 @cython.cfunc

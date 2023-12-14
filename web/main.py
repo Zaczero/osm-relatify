@@ -6,8 +6,7 @@ from itertools import chain
 import orjson
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from dacite import Config, from_dict
-from fastapi import (Depends, FastAPI, HTTPException, Request, Response,
-                     WebSocket, WebSocketDisconnect, status)
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import ORJSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -17,25 +16,35 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.websockets import WebSocketState
 
 from compression import deflate_compress, deflate_decompress
-from config import (CALC_ROUTE_MAX_PROCESSES, CALC_ROUTE_N_PROCESSES,
-                    CREATED_BY, OSM_CLIENT, OSM_SCOPES, OSM_SECRET, SECRET,
-                    USER_AGENT, WEBSITE)
+from config import (
+    CALC_ROUTE_MAX_PROCESSES,
+    CALC_ROUTE_N_PROCESSES,
+    CREATED_BY,
+    OSM_CLIENT,
+    OSM_SCOPES,
+    OSM_SECRET,
+    SECRET,
+    USER_AGENT,
+    WEBSITE,
+)
+from cython_lib.route import calc_bus_route
 from deflate_middleware import DeflateRoute
 from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
-from models.fetch_relation import (FetchRelation,
-                                   FetchRelationBusStopCollection,
-                                   FetchRelationElement, PublicTransport,
-                                   assign_none_members, find_start_stop_ways)
+from models.fetch_relation import (
+    FetchRelation,
+    FetchRelationBusStopCollection,
+    FetchRelationElement,
+    PublicTransport,
+    assign_none_members,
+    find_start_stop_ways,
+)
 from models.final_route import FinalRoute, WarningSeverity
 from openstreetmap import OpenStreetMap, UploadResult
 from overpass import Overpass
-from relation_builder import (build_osm_change, get_relation_members,
-                              sort_and_upgrade_members)
-from cython_lib.route import calc_bus_route
+from relation_builder import build_osm_change, get_relation_members, sort_and_upgrade_members
 from route_warnings import check_for_issues
-from user_session import (fetch_user_details, require_user_details,
-                          require_user_token, set_user_token, unset_user_token)
+from user_session import fetch_user_details, require_user_details, require_user_token, set_user_token, unset_user_token
 from utils import print_run_time
 
 INDEX_REDIRECT = RedirectResponse('/', status_code=status.HTTP_302_FOUND)
@@ -63,9 +72,10 @@ async def index(request: Request, user=Depends(fetch_user_details)):
 @app.post('/login')
 async def login(request: Request) -> RedirectResponse:
     async with AsyncOAuth2Client(
-            client_id=OSM_CLIENT,
-            scope=OSM_SCOPES,
-            redirect_uri=str(request.url_for('callback'))) as oauth:
+        client_id=OSM_CLIENT,
+        scope=OSM_SCOPES,
+        redirect_uri=str(request.url_for('callback')),
+    ) as oauth:
         authorization_url, state = oauth.create_authorization_url('https://www.openstreetmap.org/oauth2/authorize')
 
     request.session['oauth_state'] = state
@@ -80,14 +90,16 @@ async def callback(request: Request) -> RedirectResponse:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Invalid OAuth state')
 
     async with AsyncOAuth2Client(
-            client_id=OSM_CLIENT,
-            client_secret=OSM_SECRET,
-            redirect_uri=str(request.url_for('callback')),
-            state=state,
-            headers={
-                'User-Agent': USER_AGENT,
-            }) as oauth:
-        token = await oauth.fetch_token('https://www.openstreetmap.org/oauth2/token', authorization_response=str(request.url))
+        client_id=OSM_CLIENT,
+        client_secret=OSM_SECRET,
+        redirect_uri=str(request.url_for('callback')),
+        state=state,
+        headers={'User-Agent': USER_AGENT},
+    ) as oauth:
+        token = await oauth.fetch_token(
+            'https://www.openstreetmap.org/oauth2/token',
+            authorization_response=str(request.url),
+        )
 
     set_user_token(request, token)
     return INDEX_REDIRECT
@@ -104,16 +116,12 @@ def get_route_type(tags: dict[str, str]) -> str | None:
 
     type = tags.get('type')
 
-    if type not in {
-            'route',
-            'disused:route',
-            'was:route'}:
+    if type not in ('route', 'disused:route', 'was:route'):
         return None
 
     type_specifier = tags.get(type)
 
-    if type_specifier not in {
-            'bus'}:
+    if type_specifier not in ('bus',):
         return None
 
     return type_specifier
@@ -136,9 +144,11 @@ async def post_query(model: PostQueryModel, _=Depends(require_user_details)):
         download_targets = tuple(from_dict(Cell, t, Config(cast=[], strict=True)) for t in model.downloadTargets)
 
         if model.reload:
-            download_hist = replace(download_hist,
-                                    session=DownloadHistory.make_session(),
-                                    history=(tuple(chain.from_iterable(download_hist.history)),))
+            download_hist = replace(
+                download_hist,
+                session=DownloadHistory.make_session(),
+                history=(tuple(chain.from_iterable(download_hist.history)),),
+            )
     else:
         download_hist = None
         download_targets = None
@@ -152,7 +162,7 @@ async def post_query(model: PostQueryModel, _=Depends(require_user_details)):
         except HTTPStatusError as e:
             query_task.cancel()
             if e.response.status_code == status.HTTP_404_NOT_FOUND:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, 'Relation not found')
+                raise HTTPException(status.HTTP_404_NOT_FOUND, 'Relation not found') from e
             raise
 
         relation_tags = relation.get('tags', {})
@@ -179,7 +189,8 @@ async def post_query(model: PostQueryModel, _=Depends(require_user_details)):
         startWay=start_way,
         stopWay=stop_way,
         ways=ways,
-        busStops=bus_stop_collections)
+        busStops=bus_stop_collections,
+    )
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -201,49 +212,49 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
             body = await ws.receive_bytes()
             body = deflate_decompress(body)
             json = orjson.loads(body)
-            model = from_dict(PostCalcBusRouteModel, json,
-                              Config(cast=[ElementId, tuple, PublicTransport], strict=True))
+            model = from_dict(
+                PostCalcBusRouteModel,
+                json,
+                Config(cast=[ElementId, tuple, PublicTransport], strict=True),
+            )
 
             print(f'🛣️ Calculating bus route ({model.relationId})')
             assert model.startWay in model.ways, 'Start way not in ways'
             assert model.stopWay in model.ways, 'Stop way not in ways'
             assert all(way_id == way.id for way_id, way in model.ways.items()), 'Way ids must match'
 
-            ways_members = {
-                way_id: way
-                for way_id, way in model.ways.items()
-                if way.member}
-
-            ways_non_members = {
-                way_id: way
-                for way_id, way in model.ways.items()
-                if not way.member}
+            ways_members = {way_id: way for way_id, way in model.ways.items() if way.member}
+            ways_non_members = {way_id: way for way_id, way in model.ways.items() if not way.member}
 
             assert ways_members, 'No ways are members of the relation'
 
-            assert all(collection.platform.member
-                       for collection in model.busStops
-                       if collection.platform), 'All bus platforms must be members of the relation'
-            assert all(collection.stop.member
-                       for collection in model.busStops
-                       if collection.stop), 'All bus stops must be members of the relation'
+            assert all(
+                collection.platform.member for collection in model.busStops if collection.platform
+            ), 'All bus platforms must be members of the relation'
+            assert all(
+                collection.stop.member for collection in model.busStops if collection.stop
+            ), 'All bus stops must be members of the relation'
 
             try:
                 async with asyncio.TaskGroup() as tg:
                     get_task = tg.create_task(openstreetmap.get_relation(model.relationId))
-                    route_task = tg.create_task(asyncio.wait_for(
-                        calc_bus_route(
-                            ways_members,
-                            model.startWay,
-                            model.stopWay,
-                            model.busStops,
-                            model.tags,
-                            process_executor,
-                            n_processes=CALC_ROUTE_N_PROCESSES),
-                        timeout=3))
+                    route_task = tg.create_task(
+                        asyncio.wait_for(
+                            calc_bus_route(
+                                ways_members,
+                                model.startWay,
+                                model.stopWay,
+                                model.busStops,
+                                model.tags,
+                                process_executor,
+                                n_processes=CALC_ROUTE_N_PROCESSES,
+                            ),
+                            timeout=3,
+                        )
+                    )
 
-            except asyncio.TimeoutError:
-                raise HTTPException(status.HTTP_408_REQUEST_TIMEOUT, 'Route calculation timed out')
+            except asyncio.TimeoutError as e:
+                raise HTTPException(status.HTTP_408_REQUEST_TIMEOUT, 'Route calculation timed out') from e
 
             relation = get_task.result()
             relation_members = get_relation_members(relation)
@@ -258,7 +269,8 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
                 start_way=model.startWay,
                 end_way=model.stopWay,
                 bus_stop_collections=model.busStops,
-                relation_members=relation_members)
+                relation_members=relation_members,
+            )
 
             body = orjson.dumps(final_route, option=orjson.OPT_NON_STR_KEYS)
             body = deflate_compress(body)
@@ -297,11 +309,20 @@ class PostDownloadOsmChangeModel(BaseModel):
 async def post_download_osm_change(model: PostDownloadOsmChangeModel, _=Depends(require_user_details)):
     print(f'💾 Downloading OSM change ({model.relationId})')
 
-    route = from_dict(FinalRoute, model.route,
-                      Config(cast=[ElementId, tuple, PublicTransport, WarningSeverity], strict=True))
+    route = from_dict(
+        FinalRoute,
+        model.route,
+        Config(cast=[ElementId, tuple, PublicTransport, WarningSeverity], strict=True),
+    )
 
     with print_run_time('Building OSM change'):
-        osm_change = await build_osm_change(model.relationId, route, include_changeset_id=False, overpass=overpass, osm=openstreetmap)
+        osm_change = await build_osm_change(
+            model.relationId,
+            route,
+            include_changeset_id=False,
+            overpass=overpass,
+            osm=openstreetmap,
+        )
 
     return Response(content=osm_change, media_type='text/xml; charset=utf-8')
 
@@ -310,22 +331,34 @@ async def post_download_osm_change(model: PostDownloadOsmChangeModel, _=Depends(
 async def post_upload_osm(model: PostDownloadOsmChangeModel, token=Depends(require_user_token)) -> UploadResult:
     print(f'🌐 Uploading OSM change ({model.relationId})')
 
-    route = from_dict(FinalRoute, model.route,
-                      Config(cast=[ElementId, tuple, PublicTransport, WarningSeverity], strict=True))
+    route = from_dict(
+        FinalRoute,
+        model.route,
+        Config(cast=[ElementId, tuple, PublicTransport, WarningSeverity], strict=True),
+    )
 
     with print_run_time('Building OSM change'):
-        osm_change = await build_osm_change(model.relationId, route, include_changeset_id=True, overpass=overpass, osm=openstreetmap)
+        osm_change = await build_osm_change(
+            model.relationId,
+            route,
+            include_changeset_id=True,
+            overpass=overpass,
+            osm=openstreetmap,
+        )
 
     openstreetmap_auth = OpenStreetMap(oauth_token=token)
     openstreetmap_user = await openstreetmap_auth.get_authorized_user()
     user_edits = openstreetmap_user['changesets']['count']
 
-    upload_result = await openstreetmap_auth.upload_osm_change(osm_change, {
-        'changesets_count': user_edits + 1,
-        'comment':  model.make_comment(),
-        'created_by': CREATED_BY,
-        'website': WEBSITE,
-    })
+    upload_result = await openstreetmap_auth.upload_osm_change(
+        osm_change,
+        {
+            'changesets_count': user_edits + 1,
+            'comment': model.make_comment(),
+            'created_by': CREATED_BY,
+            'website': WEBSITE,
+        },
+    )
 
     if upload_result.ok:
         print(f'✅ Changeset upload success: #{upload_result.changeset_id}')

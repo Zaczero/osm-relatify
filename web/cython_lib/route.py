@@ -8,7 +8,7 @@ from typing import NamedTuple, Self
 
 import cython
 
-from cython_lib.utils import haversine_distance
+from cython_lib.geoutils import haversine_distance
 from models.element_id import ElementId
 from models.fetch_relation import FetchRelationBusStopCollection, FetchRelationElement
 from models.final_route import FinalRoute, FinalRouteWay
@@ -18,11 +18,11 @@ from utils import print_run_time
 if cython.compiled:
     from cython.cimports.libc.math import acos, pi
 
-    print('Cython: 🐇 compiled')
+    print(f'{__name__}: 🐇 compiled')
 else:
     from math import acos, pi
 
-    print('Cython: 🐌 not compiled')
+    print(f'{__name__}: 🐌 not compiled')
 
 
 @cython.cfunc

@@ -13,14 +13,14 @@ from scipy.optimize import linear_sum_assignment
 from sklearn.neighbors import BallTree
 
 from config import BUS_COLLECTION_SEARCH_AREA
-from cython_lib.utils import haversine_distance, radians_tuple
-from models.fetch_relation import (FetchRelationBusStop,
-                                   FetchRelationBusStopCollection,
-                                   PublicTransport)
+from cython_lib.geoutils import haversine_distance, radians_tuple
+from models.fetch_relation import FetchRelationBusStop, FetchRelationBusStopCollection, PublicTransport
 from utils import extract_numbers
 
 
-def _pick_best(elements: list[FetchRelationBusStop]) -> tuple[Sequence[FetchRelationBusStop], Sequence[FetchRelationBusStop]]:
+def _pick_best(
+    elements: list[FetchRelationBusStop]
+) -> tuple[Sequence[FetchRelationBusStop], Sequence[FetchRelationBusStop]]:
     if not elements:
         return tuple(), tuple()
 
@@ -30,7 +30,9 @@ def _pick_best(elements: list[FetchRelationBusStop]) -> tuple[Sequence[FetchRela
     return elements_explicit, elements_implicit
 
 
-def _assign(primary: Sequence[FetchRelationBusStop], elements: Sequence[FetchRelationBusStop], *, element_reuse: bool) -> Generator[FetchRelationBusStop | None, None, None]:
+def _assign(
+    primary: Sequence[FetchRelationBusStop], elements: Sequence[FetchRelationBusStop], *, element_reuse: bool
+) -> Generator[FetchRelationBusStop | None, None, None]:
     if len(elements) >= 2:
         # find the closest stop to each platform
         if len(elements) < len(primary):
@@ -40,10 +42,8 @@ def _assign(primary: Sequence[FetchRelationBusStop], elements: Sequence[FetchRel
 
             tree = BallTree(tuple(radians_tuple(e.latLng) for e in elements), metric='haversine')
             query_indices = tree.query(
-                tuple(radians_tuple(p.latLng) for p in primary),
-                k=1,
-                return_distance=False,
-                sort_results=False)
+                tuple(radians_tuple(p.latLng) for p in primary), k=1, return_distance=False, sort_results=False
+            )
 
             return (elements[i] for i in query_indices[:, 0])
 
@@ -93,10 +93,8 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
     G = nx.Graph()
 
     query_indices, _ = bus_stops_tree.query_radius(
-        bus_stops_coordinates,
-        r=search_latLng_rad,
-        return_distance=True,
-        sort_results=True)
+        bus_stops_coordinates, r=search_latLng_rad, return_distance=True, sort_results=True
+    )
 
     # group by area
     for i in range(len(bus_stops)):
@@ -129,11 +127,12 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
         if len(name_groups) > 1:
             expand_data = {
                 expand_key: extract(expand_key, name_groups.keys(), scorer=token_ratio, score_cutoff=89)
-                for expand_key in name_groups}
+                for expand_key in name_groups
+            }
 
-            expand_data = sorted(expand_data.items(),
-                                 key=lambda t: (sum(map(itemgetter(1), t[1])), -len(t[0])),
-                                 reverse=True)
+            expand_data = sorted(
+                expand_data.items(), key=lambda t: (sum(map(itemgetter(1), t[1])), -len(t[0])), reverse=True
+            )
 
             # pprint(expand_data)
 
@@ -143,7 +142,7 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
                 expand_group_public_transports = {bus_stop.public_transport for bus_stop in expand_group}
                 expanded = False
 
-                for (target_key, name_score, _) in target_data:
+                for target_key, name_score, _ in target_data:
                     if target_key == expand_key:
                         continue
 
@@ -165,8 +164,10 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
                     if expand_group_public_transports.intersection(target_group_public_transports):
                         continue
 
-                    print(f'[COLL] [{name_score:5.1f}] Expanded {expand_key!r} to {target_key!r}, '
-                          f'ID={expand_group[0].nice_id!r}')
+                    print(
+                        f'[COLL] [{name_score:5.1f}] Expanded {expand_key!r} to {target_key!r}, '
+                        f'ID={expand_group[0].nice_id!r}'
+                    )
                     target_group.extend(expand_group)
                     expanded = True
 
@@ -195,46 +196,38 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
 
             if platforms_explicit and stops_explicit:
                 collection_name = next(s.name for s in name_group if s.groupName == name_key)
-                print(f'🚧 Warning: Invalid explicit platforms and stops for {collection_name!r}, '
-                      f'ID={stops_explicit[0].nice_id!r}')
+                print(
+                    f'🚧 Warning: Invalid explicit platforms and stops for {collection_name!r}, '
+                    f'ID={stops_explicit[0].nice_id!r}'
+                )
 
             if platforms_explicit:
                 for platform, stop in zip(platforms_explicit, _assign(platforms_explicit, stops, element_reuse=True)):
-                    collections.append(FetchRelationBusStopCollection(
-                        platform=platform,
-                        stop=stop))
+                    collections.append(FetchRelationBusStopCollection(platform=platform, stop=stop))
 
                 continue
 
             if stops_explicit:
                 for stop, platform in zip(stops_explicit, _assign(stops_explicit, platforms, element_reuse=False)):
-                    collections.append(FetchRelationBusStopCollection(
-                        platform=platform,
-                        stop=stop))
+                    collections.append(FetchRelationBusStopCollection(platform=platform, stop=stop))
 
                 continue
 
             if platforms_implicit and stops_implicit:
                 for platform, stop in zip(platforms_implicit, _assign(platforms_implicit, stops, element_reuse=True)):
-                    collections.append(FetchRelationBusStopCollection(
-                        platform=platform,
-                        stop=stop))
+                    collections.append(FetchRelationBusStopCollection(platform=platform, stop=stop))
 
                 continue
 
             if platforms_implicit:  # and not stops_implicit
                 for platform in platforms_implicit:
-                    collections.append(FetchRelationBusStopCollection(
-                        platform=platform,
-                        stop=None))
+                    collections.append(FetchRelationBusStopCollection(platform=platform, stop=None))
 
                 continue
 
             if stops_implicit:  # and not platforms_implicit
                 for stop in stops_implicit:
-                    collections.append(FetchRelationBusStopCollection(
-                        platform=None,
-                        stop=stop))
+                    collections.append(FetchRelationBusStopCollection(platform=None, stop=stop))
 
                 continue
 

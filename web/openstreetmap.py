@@ -1,5 +1,5 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 import httpx
 import xmltodict
@@ -20,7 +20,7 @@ class UploadResult:
 
 
 class OpenStreetMap:
-    def __init__(self, *, username: str = None, password: str = None, oauth_token: dict = None):
+    def __init__(self, *, username: str | None = None, password: str | None = None, oauth_token: dict | None = None):
         if oauth_token:
             self.auth = OAuth2Auth(oauth_token)
         elif username and password:
@@ -61,8 +61,10 @@ class OpenStreetMap:
     @cached(TTLCache(maxsize=1024, ttl=60))
     async def _get_elements(self, elements_type: str, element_ids: Iterable[str], json: bool) -> list[dict]:
         async with self._get_http_client() as http:
-            r = await http.get(f'/0.6/{elements_type}{".json" if json else ""}', params={
-                elements_type: ','.join(map(str, element_ids))})
+            r = await http.get(
+                f'/0.6/{elements_type}{".json" if json else ""}',
+                params={elements_type: ','.join(map(str, element_ids))},
+            )
             r.raise_for_status()
 
         if json:
@@ -97,20 +99,31 @@ class OpenStreetMap:
             # trim value if too long
             if len(value) > TAG_MAX_LENGTH:
                 print(f'🚧 Warning: Trimming {key} value because it exceeds {TAG_MAX_LENGTH} characters: {value}')
-                tags[key] = value[:TAG_MAX_LENGTH - 1] + '…'
+                tags[key] = value[: TAG_MAX_LENGTH - 1] + '…'
 
-        changeset_dict = {'osm': {'changeset': {'tag': [
-            {
-                '@k': k,
-                '@v': v
-            } for k, v in tags.items()
-        ]}}}
+        changeset_dict = {
+            'osm': {
+                'changeset': {
+                    'tag': [
+                        {
+                            '@k': k,
+                            '@v': v,
+                        }
+                        for k, v in tags.items()
+                    ]
+                }
+            }
+        }
 
         changeset = xmltodict.unparse(changeset_dict)
 
         async with self._get_http_client() as http:
-            r = await http.put('/0.6/changeset/create', content=changeset, headers={
-                'Content-Type': 'text/xml; charset=utf-8'}, follow_redirects=False)
+            r = await http.put(
+                '/0.6/changeset/create',
+                content=changeset,
+                headers={'Content-Type': 'text/xml; charset=utf-8'},
+                follow_redirects=False,
+            )
             r.raise_for_status()
 
             changeset_id_raw = r.text
@@ -118,13 +131,27 @@ class OpenStreetMap:
 
             osm_change = osm_change.replace(CHANGESET_ID_PLACEHOLDER, changeset_id_raw)
 
-            upload_resp = await http.post(f'/0.6/changeset/{changeset_id_raw}/upload', content=osm_change, headers={
-                'Content-Type': 'text/xml; charset=utf-8'}, timeout=150)
+            upload_resp = await http.post(
+                f'/0.6/changeset/{changeset_id_raw}/upload',
+                content=osm_change,
+                headers={'Content-Type': 'text/xml; charset=utf-8'},
+                timeout=150,
+            )
 
             r = await http.put(f'/0.6/changeset/{changeset_id_raw}/close')
             r.raise_for_status()
 
         if not upload_resp.is_success:
-            return UploadResult(ok=False, error_code=upload_resp.status_code, error_message=upload_resp.text, changeset_id=changeset_id)
+            return UploadResult(
+                ok=False,
+                error_code=upload_resp.status_code,
+                error_message=upload_resp.text,
+                changeset_id=changeset_id,
+            )
 
-        return UploadResult(ok=True, error_code=None, error_message=None, changeset_id=changeset_id)
+        return UploadResult(
+            ok=True,
+            error_code=None,
+            error_message=None,
+            changeset_id=changeset_id,
+        )

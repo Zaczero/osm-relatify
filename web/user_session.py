@@ -57,8 +57,8 @@ async def require_user_details(user=Depends(fetch_user_details)) -> dict:
 def require_user_token(request: Request) -> dict:
     try:
         return request.session['token']
-    except KeyError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Unauthorized')
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Unauthorized') from e
 
 
 def set_user_token(request: Request, token: dict) -> bool:

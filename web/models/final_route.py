@@ -1,9 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 
-from models.element_id import ElementId
-from models.fetch_relation import (FetchRelationBusStopCollection,
-                                   FetchRelationElement)
+from models.fetch_relation import FetchRelationBusStopCollection, FetchRelationElement
 from models.relation_member import RelationMember
 
 

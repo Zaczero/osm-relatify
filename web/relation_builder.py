@@ -9,14 +9,13 @@ import xmltodict
 from sklearn.neighbors import BallTree
 
 from config import CHANGESET_ID_PLACEHOLDER, CREATED_BY
+from cython_lib.geoutils import haversine_distance, radians_tuple
 from models.element_id import ElementId, split_element_id
-from models.fetch_relation import (FetchRelationBusStopCollection,
-                                   FetchRelationElement)
+from models.fetch_relation import FetchRelationBusStopCollection, FetchRelationElement
 from models.final_route import FinalRoute
 from models.relation_member import RelationMember
 from openstreetmap import OpenStreetMap
 from overpass import Overpass, QueryParentsResult
-from cython_lib.utils import haversine_distance, radians_tuple
 
 
 class SortedBusEntry(NamedTuple):
@@ -27,7 +26,9 @@ class SortedBusEntry(NamedTuple):
     right_hand_side: bool | None
 
 
-def is_right_hand_side(latLng1: tuple[float, float], latLng2: tuple[float, float], latLngTest: tuple[float, float]) -> bool | None:
+def is_right_hand_side(
+    latLng1: tuple[float, float], latLng2: tuple[float, float], latLngTest: tuple[float, float]
+) -> bool | None:
     if latLng1 == latLngTest or latLng2 == latLngTest:
         return None
 
@@ -38,7 +39,9 @@ def is_right_hand_side(latLng1: tuple[float, float], latLng2: tuple[float, float
     return cross_product_z > 0
 
 
-def interpolate_latLng(latLng1_rad: tuple[float, float], latLng2_rad: tuple[float, float], threshold: float) -> list[tuple[float, float]]:
+def interpolate_latLng(
+    latLng1_rad: tuple[float, float], latLng2_rad: tuple[float, float], threshold: float
+) -> list[tuple[float, float]]:
     distance = haversine_distance(latLng1_rad, latLng2_rad, unit_radians=True)
     result_size = int(distance / threshold) + 1
     result = [latLng1_rad]
@@ -53,7 +56,9 @@ def interpolate_latLng(latLng1_rad: tuple[float, float], latLng2_rad: tuple[floa
     return result
 
 
-def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection], ways: Iterable[FetchRelationElement]) -> list[SortedBusEntry]:
+def sort_bus_on_path(
+    bus_stop_collections: list[FetchRelationBusStopCollection], ways: Iterable[FetchRelationElement]
+) -> list[SortedBusEntry]:
     if not bus_stop_collections:
         return []
 
@@ -63,7 +68,9 @@ def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection],
 
     for way in ways:
         way_latLngs_rad = tuple(radians_tuple(latLng) for latLng in way.latLngs)
-        for idx, (current_latLng_rad, next_latLng_rad) in enumerate(zip_longest(way_latLngs_rad, way_latLngs_rad[1:], fillvalue=way_latLngs_rad[-1])):
+        for idx, (current_latLng_rad, next_latLng_rad) in enumerate(
+            zip_longest(way_latLngs_rad, way_latLngs_rad[1:], fillvalue=way_latLngs_rad[-1])
+        ):
             for latLng_rad in interpolate_latLng(current_latLng_rad, next_latLng_rad, interpolate_threshold):
                 latLng_rad_idx_way_map[latLng_rad] = (idx, way)
                 tree_coordinates_rad.append(latLng_rad)
@@ -75,7 +82,9 @@ def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection],
 
     result = []
 
-    for collection, collection_latLng_rad, distance, idx in zip(bus_stop_collections, collections_latLng_rad, distances, idxs):
+    for collection, collection_latLng_rad, distance, idx in zip(
+        bus_stop_collections, collections_latLng_rad, distances, idxs
+    ):
         distance = distance[0] * 6_371_000  # earth radius
         idx = idx[0]
 
@@ -86,21 +95,26 @@ def sort_bus_on_path(bus_stop_collections: list[FetchRelationBusStopCollection],
             right_hand_side = is_right_hand_side(
                 radians_tuple(neighbor_way.latLngs[neighbor_latLngs_idx - 1]),
                 neighbor_latLng_rad,
-                collection_latLng_rad)
+                collection_latLng_rad,
+            )
         elif neighbor_latLngs_idx + 1 < len(neighbor_way.latLngs):
             right_hand_side = is_right_hand_side(
                 neighbor_latLng_rad,
                 radians_tuple(neighbor_way.latLngs[neighbor_latLngs_idx + 1]),
-                collection_latLng_rad)
+                collection_latLng_rad,
+            )
         else:
             right_hand_side = None
 
-        result.append(SortedBusEntry(
-            bus_stop_collection=collection,
-            sort_index=idx,
-            neighbor_id=neighbor_way.id,
-            distance_from_neighbor=distance,
-            right_hand_side=right_hand_side))
+        result.append(
+            SortedBusEntry(
+                bus_stop_collection=collection,
+                sort_index=idx,
+                neighbor_id=neighbor_way.id,
+                distance_from_neighbor=distance,
+                right_hand_side=right_hand_side,
+            )
+        )
 
     assert not any(e.sort_index == -1 for e in result)
     return sorted(result, key=lambda x: x.sort_index)  # TODO: sort stop, platform on the same sort_index
@@ -115,11 +129,15 @@ def _simplify_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
     while i < len(way_ids_parts):
         way_id, way_id_parts = way_ids[i], way_ids_parts[i]
 
-        if way_id_parts.extraNum == 1 or (way_id_parts.extraNum is not None and way_id_parts.extraNum == way_id_parts.maxNum):
+        if way_id_parts.extraNum == 1 or (
+            way_id_parts.extraNum is not None and way_id_parts.extraNum == way_id_parts.maxNum
+        ):
             last_i = i + way_id_parts.maxNum - 1
 
             if last_i < len(way_ids):
-                if all(other_way_id_parts.id == way_id_parts.id for other_way_id_parts in way_ids_parts[i + 1:last_i + 1]):
+                if all(
+                    other_way_id_parts.id == way_id_parts.id for other_way_id_parts in way_ids_parts[i + 1 : last_i + 1]
+                ):
                     # simplify
                     i += way_id_parts.maxNum
                     continue
@@ -138,11 +156,16 @@ def _simplify_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
         way_id, way_id_parts = way_ids[i], way_ids_parts[i]
 
         if way_id_parts.id not in simplify_blacklist:
-            if way_id_parts.extraNum == 1 or (way_id_parts.extraNum is not None and way_id_parts.extraNum == way_id_parts.maxNum):
+            if way_id_parts.extraNum == 1 or (
+                way_id_parts.extraNum is not None and way_id_parts.extraNum == way_id_parts.maxNum
+            ):
                 last_i = i + way_id_parts.maxNum - 1
 
                 if last_i < len(way_ids):
-                    if all(other_way_id_parts.id == way_id_parts.id for other_way_id_parts in way_ids_parts[i + 1:last_i + 1]):
+                    if all(
+                        other_way_id_parts.id == way_id_parts.id
+                        for other_way_id_parts in way_ids_parts[i + 1 : last_i + 1]
+                    ):
                         # simplify
                         result.append(ElementId(way_id_parts.id))
                         i += way_id_parts.maxNum
@@ -155,17 +178,11 @@ def _simplify_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
 
 
 def get_relation_members(relation: dict) -> list[RelationMember]:
-    return [RelationMember(
-        id=ElementId(m['ref']),
-        type=m['type'],
-        role=m['role'])
-        for m in relation['members']]
+    return [RelationMember(id=ElementId(m['ref']), type=m['type'], role=m['role']) for m in relation['members']]
 
 
 def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationMember]) -> FinalRoute:
-    id_relation_member_map = {
-        member.id: member
-        for member in relation_members}
+    id_relation_member_map = {member.id: member for member in relation_members}
 
     members = []
 
@@ -231,10 +248,7 @@ def _initialize_osm_change_structure() -> dict:
             'create': {
                 'way': [],
             },
-            'modify': {
-                'way': [],
-                'relation': []
-            }
+            'modify': {'way': [], 'relation': []},
         }
     }
 
@@ -247,7 +261,15 @@ def _set_changeset_placeholder(data: dict, include_changeset_id: bool) -> None:
 
 
 # TODO: support restriction-type relations
-def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset[int], parents: QueryParentsResult, native_id_element_ids_map: dict[int, dict[int, ElementId]], id_way_map: dict[ElementId, FetchRelationElement], element_id_unique_map: dict[ElementId, int], unique_native_id_map: dict[int, int]) -> list[dict]:
+def _update_relations_after_split(
+    ignore_relation_id: int,
+    split_ways: frozenset[int],
+    parents: QueryParentsResult,
+    native_id_element_ids_map: dict[int, dict[int, ElementId]],
+    id_way_map: dict[ElementId, FetchRelationElement],
+    element_id_unique_map: dict[ElementId, int],
+    unique_native_id_map: dict[int, int],
+) -> list[dict]:
     result: dict[int, dict] = {}
 
     # iterate over the split ways
@@ -279,7 +301,11 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
                 last_way_nd = id_way_map[split_ways_in_order[-1][1]].nodes[-1]
                 is_reversed = False
 
-                if member_index > 0 and (before_entry := relation['member'][member_index - 1]) and before_entry['@type'] == 'way':
+                if (
+                    member_index > 0
+                    and (before_entry := relation['member'][member_index - 1])
+                    and before_entry['@type'] == 'way'
+                ):
                     before_way_id = before_entry['@ref']
                     before_way_id = unique_native_id_map.get(before_way_id, before_way_id)
                     before_way = parents.ways_map[before_way_id]
@@ -290,7 +316,11 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
                 else:
                     before_way = None
 
-                if member_index + 1 < len(relation['member']) and (after_entry := relation['member'][member_index + 1]) and after_entry['@type'] == 'way':
+                if (
+                    member_index + 1 < len(relation['member'])
+                    and (after_entry := relation['member'][member_index + 1])
+                    and after_entry['@type'] == 'way'
+                ):
                     after_way_id = after_entry['@ref']
                     after_way_id = unique_native_id_map.get(after_way_id, after_way_id)
                     after_way = parents.ways_map[after_way_id]
@@ -337,11 +367,14 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
                     if not safe_to_insert:
                         continue
 
-                    relation['member'].insert(member_index, {
-                        '@type': 'way',
-                        '@ref': element_id_unique_map.get(element_id, element_id),
-                        '@role': way_role,
-                    })
+                    relation['member'].insert(
+                        member_index,
+                        {
+                            '@type': 'way',
+                            '@ref': element_id_unique_map.get(element_id, element_id),
+                            '@role': way_role,
+                        },
+                    )
 
                     member_index += 1
                     insert_count += 1
@@ -359,11 +392,14 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
                 if insert_count == 0:
                     print(f'🚧 Warning: Could not insert split ways into relation {relation["@id"]} (way {way_id})')
                     for _, element_id in split_ways_in_order:
-                        relation['member'].insert(member_index, {
-                            '@type': 'way',
-                            '@ref': element_id_unique_map.get(element_id, element_id),
-                            '@role': way_role,
-                        })
+                        relation['member'].insert(
+                            member_index,
+                            {
+                                '@type': 'way',
+                                '@ref': element_id_unique_map.get(element_id, element_id),
+                                '@role': way_role,
+                            },
+                        )
 
                         member_index += 1
                         insert_count += 1
@@ -371,7 +407,9 @@ def _update_relations_after_split(ignore_relation_id: int, split_ways: frozenset
     return result.values()
 
 
-async def build_osm_change(relation_id: int, route: FinalRoute, include_changeset_id: bool, overpass: Overpass, osm: OpenStreetMap) -> str:
+async def build_osm_change(
+    relation_id: int, route: FinalRoute, include_changeset_id: bool, overpass: Overpass, osm: OpenStreetMap
+) -> str:
     split_ways: set[int] = set()
     native_id_element_ids_map: dict[int, dict[int, ElementId]] = defaultdict(dict)
     element_id_unique_map: dict[ElementId, int] = {}
@@ -399,8 +437,9 @@ async def build_osm_change(relation_id: int, route: FinalRoute, include_changese
                 print(f'🚧 Warning: Repeated element_id: {element_id}')
 
     for group in native_id_element_ids_map.values():
-        assert len(group) == split_element_id(group[1]).maxNum, \
-            f'Split ways are not complete: {", ".join(f"{k}={v}" for k, v in group.items())}'
+        assert (
+            len(group) == split_element_id(group[1]).maxNum
+        ), f'Split ways are not complete: {", ".join(f"{k}={v}" for k, v in group.items())}'
 
     split_ways = frozenset(split_ways)
 
@@ -413,9 +452,9 @@ async def build_osm_change(relation_id: int, route: FinalRoute, include_changese
     if ways_task:
         ways = await ways_task
 
-        id_way_map = \
-            {route_way.way.id: route_way.way for route_way in route.ways} | \
-            {way.id: way for way in route.extraWaysToUpdate}
+        id_way_map = {route_way.way.id: route_way.way for route_way in route.ways} | {
+            way.id: way for way in route.extraWaysToUpdate
+        }
 
         # process fetched ways (split ways)
         for way_data in ways:
@@ -441,9 +480,7 @@ async def build_osm_change(relation_id: int, route: FinalRoute, include_changese
 
                 _set_changeset_placeholder(new_data, include_changeset_id)
 
-                new_data['nd'] = [
-                    {'@ref': node_id}
-                    for node_id in element_way.nodes]
+                new_data['nd'] = [{'@ref': node_id} for node_id in element_way.nodes]
 
                 result['osmChange'][action]['way'].append(new_data)
 
@@ -457,7 +494,8 @@ async def build_osm_change(relation_id: int, route: FinalRoute, include_changese
             native_id_element_ids_map=native_id_element_ids_map,
             id_way_map=id_way_map,
             element_id_unique_map=element_id_unique_map,
-            unique_native_id_map=unique_native_id_map)
+            unique_native_id_map=unique_native_id_map,
+        )
 
         for parent_relation in parent_relations:
             # strip unnecessary data
@@ -482,7 +520,8 @@ async def build_osm_change(relation_id: int, route: FinalRoute, include_changese
 
     relation_data['member'] = [
         {'@type': member.type, '@ref': element_id_unique_map.get(member.id, member.id), '@role': member.role}
-        for member in route.members]
+        for member in route.members
+    ]
 
     result['osmChange']['modify']['relation'].append(relation_data)
 

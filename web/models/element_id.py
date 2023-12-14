@@ -9,11 +9,7 @@ class ElementId(str):
             return super().__new__(cls, str(value))
         else:
             assert 1 <= extraNum <= maxNum
-            return super().__new__(cls, '_'.join((
-                str(value),
-                str(extraNum),
-                str(maxNum)
-            )))
+            return super().__new__(cls, f'{value}_{extraNum}_{maxNum}')
 
 
 class ElementIdParts(NamedTuple):

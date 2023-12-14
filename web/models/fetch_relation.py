@@ -1,16 +1,21 @@
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from enum import Enum
+from itertools import pairwise
 from typing import Self
 
+from cython_lib.geoutils import haversine_distance
 from models.bounding_box import BoundingBox
 from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
 from utils import normalize_name
-from cython_lib.utils import haversine_distance
 
 
-def _interpolate_coords(latLng1: tuple[float, float], latLng2: tuple[float, float], ratio: float) -> tuple[float, float]:
+def _interpolate_coords(
+    latLng1: tuple[float, float],
+    latLng2: tuple[float, float],
+    ratio: float,
+) -> tuple[float, float]:
     lat1, lon1 = latLng1
     lat2, lon2 = latLng2
     lat = lat1 + (lat2 - lat1) * ratio
@@ -19,15 +24,13 @@ def _interpolate_coords(latLng1: tuple[float, float], latLng2: tuple[float, floa
 
 
 def _calculate_length_and_midpoint(latLngs: list[tuple[float, float]]) -> tuple[float, tuple[float, float]]:
-    segment_distances = tuple(
-        haversine_distance(latLng1, latLng2)
-        for latLng1, latLng2 in zip(latLngs, latLngs[1:]))
+    segment_distances = tuple(haversine_distance(latLng1, latLng2) for latLng1, latLng2 in pairwise(latLngs))
 
     total_distance = sum(segment_distances)
     half_distance = total_distance / 2
     accumulated_distance = 0.0
 
-    for latLng1, latLng2, segment_distance in zip(latLngs, latLngs[1:], segment_distances):
+    for (latLng1, latLng2), segment_distance in zip(pairwise(latLngs), segment_distances, strict=True):
         accumulated_distance += segment_distance
 
         if accumulated_distance >= half_distance:
@@ -91,15 +94,9 @@ class FetchRelationBusStop:
         if name and local_ref and name.endswith(local_ref):
             local_ref = ''
 
-        name = normalize_name(
-            ' '.join((name, local_ref)),
-            whitespace=True)
+        name = normalize_name(f'{name} {local_ref}', whitespace=True)
 
-        group_name = normalize_name(
-            name,
-            lower=True,
-            special=True,
-            number=True)
+        group_name = normalize_name(name, lower=True, special=True, number=True)
 
         return cls(
             id=ElementId(data['id']),
@@ -110,7 +107,8 @@ class FetchRelationBusStop:
             name=name,
             groupName=group_name,
             highway=data['tags'].get('highway', None),
-            public_transport=PublicTransport(data['tags']['public_transport']))
+            public_transport=PublicTransport(data['tags']['public_transport']),
+        )
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -137,15 +135,16 @@ class FetchRelation:
     busStops: list[FetchRelationBusStopCollection]
 
 
-def find_start_stop_ways(ways: dict[ElementId, FetchRelationElement], id_map: dict[int, list[ElementId]], relation: dict) -> tuple[FetchRelationElement, FetchRelationElement]:
+def find_start_stop_ways(
+    ways: dict[ElementId, FetchRelationElement],
+    id_map: dict[int, list[ElementId]],
+    relation: dict,
+) -> tuple[FetchRelationElement, FetchRelationElement]:
     member_ids = [
-        way['ref'] for way in relation['members']
-        if way['type'] == 'way' and way['role'] in {
-            '',
-            'forward',
-            'backward',
-            'route'
-        }]
+        way['ref']
+        for way in relation['members']
+        if way['type'] == 'way' and way['role'] in {'', 'forward', 'backward', 'route'}
+    ]
 
     assert member_ids, 'Relation has no way members'
 
@@ -161,8 +160,7 @@ def find_start_stop_ways(ways: dict[ElementId, FetchRelationElement], id_map: di
         for endpoint_way_id in [all_way_ids[0], all_way_ids[-1]]:
             endpoint_way = ways[endpoint_way_id]
 
-            if sum(1 for connected_way_id in endpoint_way.connectedTo
-                   if ways[connected_way_id].member) <= 1:
+            if sum(1 for connected_way_id in endpoint_way.connectedTo if ways[connected_way_id].member) <= 1:
                 return endpoint_way_id
 
         return all_way_ids[len(all_way_ids) // 2]
@@ -193,7 +191,10 @@ def find_start_stop_ways(ways: dict[ElementId, FetchRelationElement], id_map: di
     return ways[start_way_id], ways[stop_way_id]
 
 
-def assign_none_members(bus_stop_collections: list[FetchRelationBusStopCollection], relation: dict) -> list[FetchRelationBusStopCollection]:
+def assign_none_members(
+    bus_stop_collections: list[FetchRelationBusStopCollection],
+    relation: dict,
+) -> list[FetchRelationBusStopCollection]:
     collection_platform_use_counter = defaultdict(int)
     collection_stop_use_counter = defaultdict(int)
     result = []
@@ -221,9 +222,11 @@ def assign_none_members(bus_stop_collections: list[FetchRelationBusStopCollectio
 
         for i, collection in enumerate(result):
             if collection.platform is not None and collection.platform.typed_id == typed_id:
-                result[i] = replace(collection,
-                                    platform=replace(collection.platform, member=True),
-                                    stop=replace(collection.stop, member=True) if collection.stop else None)
+                result[i] = replace(
+                    collection,
+                    platform=replace(collection.platform, member=True),
+                    stop=replace(collection.stop, member=True) if collection.stop else None,
+                )
                 break
 
     # 2 pass: assign stop as a member for stop w/o platform
@@ -239,8 +242,7 @@ def assign_none_members(bus_stop_collections: list[FetchRelationBusStopCollectio
 
         for i, collection in enumerate(result):
             if collection.platform is None and collection.stop is not None and collection.stop.typed_id == typed_id:
-                result[i] = replace(collection,
-                                    stop=replace(collection.stop, member=True))
+                result[i] = replace(collection, stop=replace(collection.stop, member=True))
                 break
 
     return result

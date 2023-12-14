@@ -1,4 +1,4 @@
-def postprocessor(path, key, value):
+def postprocessor(_, key, value):
     if key in ('@id', '@ref', '@changeset', '@uid'):
         return key, int(value)
 
