@@ -1,9 +1,9 @@
 import asyncio
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import replace
 from itertools import chain, cycle, islice, zip_longest
-from math import e
-from typing import Generator, Iterable, NamedTuple, Sequence
+from typing import NamedTuple
 
 import xmltodict
 from sklearn.neighbors import BallTree
@@ -296,7 +296,7 @@ def _update_relations_after_split(
 
                 way_role = relation['member'][member_index]['@role']
 
-                split_ways_in_order = list(sorted(element_ids.items(), key=lambda x: x[0]))
+                split_ways_in_order = sorted(element_ids.items(), key=lambda x: x[0])
                 first_way_nd = id_way_map[split_ways_in_order[0][1]].nodes[0]
                 last_way_nd = id_way_map[split_ways_in_order[-1][1]].nodes[-1]
                 is_reversed = False

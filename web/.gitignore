@@ -1,5 +1,8 @@
-# Created by https://www.toptal.com/developers/gitignore/api/dotenv,python,pycharm,visualstudiocode
-# Edit at https://www.toptal.com/developers/gitignore?templates=dotenv,python,pycharm,visualstudiocode
+# Created by https://www.toptal.com/developers/gitignore/api/dotenv,python,pycharm,visualstudiocode,direnv
+# Edit at https://www.toptal.com/developers/gitignore?templates=dotenv,python,pycharm,visualstudiocode,direnv
+
+### direnv ###
+.direnv
 
 ### dotenv ###
 .env
@@ -285,6 +288,9 @@ poetry.toml
 # ruff
 .ruff_cache/
 
+# LSP config files
+pyrightconfig.json
+
 ### VisualStudioCode ###
 .vscode/*
 !.vscode/settings.json
@@ -304,7 +310,7 @@ poetry.toml
 .history
 .ionide
 
-# End of https://www.toptal.com/developers/gitignore/api/dotenv,python,pycharm,visualstudiocode
+# End of https://www.toptal.com/developers/gitignore/api/dotenv,python,pycharm,visualstudiocode,direnv
 
 cython_lib/*.c
 cython_lib/*.html

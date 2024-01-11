@@ -1,25 +1,21 @@
-{ pkgsnix ? import ./pkgs.nix
-, pkgs ? pkgsnix.pkgs
-, unstable ? pkgsnix.unstable
-}:
+{ pkgs ? import <nixpkgs> { }, ... }:
 
-with pkgs; let
+let
   shell = import ./shell.nix {
-    inherit pkgs;
-    isDocker = true;
+    isDevelopment = false;
   };
 
-  python-venv = buildEnv {
+  python-venv = pkgs.buildEnv {
     name = "python-venv";
     paths = [
-      (runCommand "python-venv" { } ''
+      (pkgs.runCommand "python-venv" { } ''
         mkdir -p $out/lib
-        cp -r "${./.venv/lib/python3.11/site-packages}"/* $out/lib
+        cp -r "${./.venv/lib/python3.12/site-packages}"/* $out/lib
       '')
     ];
   };
 in
-dockerTools.buildLayeredImage {
+with pkgs; dockerTools.buildLayeredImage {
   name = "docker.monicz.dev/osm-relatify";
   tag = "latest";
   maxLayers = 10;
@@ -29,14 +25,12 @@ dockerTools.buildLayeredImage {
   extraCommands = ''
     set -e
     mkdir app && cd app
-    cp "${./.}"/LICENSE .
-    cp "${./.}"/Makefile .
     cp "${./.}"/*.py .
     cp -r "${./.}"/cython_lib .
     cp -r "${./.}"/models .
     cp -r "${./.}"/static .
     cp -r "${./.}"/templates .
-    export PATH="${esbuild}/bin:$PATH"
+    export PATH="${lib.makeBinPath shell.buildInputs}:$PATH"
     ${shell.shellHook}
   '';
 

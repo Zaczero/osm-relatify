@@ -12,7 +12,8 @@ setup(
                 '*',
                 ['cython_lib/*.py'],
                 extra_compile_args=[
-                    '-march=znver3',  # ryzen 5000 or newer
+                    '-march=x86-64-v2',
+                    '-mtune=generic',
                     '-ffast-math',
                     '-fopenmp',
                     '-flto=auto',

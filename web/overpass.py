@@ -1,7 +1,8 @@
 from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from dataclasses import replace
 from itertools import chain
-from typing import Iterable, NamedTuple, Sequence
+from typing import NamedTuple
 
 import httpx
 import xmltodict
@@ -9,15 +10,12 @@ from asyncache import cached
 from cachetools import TTLCache
 
 from bus_collection_builder import build_bus_stop_collections
-from config import (DOWNLOAD_RELATION_GRID_CELL_EXPAND,
-                    DOWNLOAD_RELATION_WAY_BB_EXPAND, OVERPASS_API_INTERPRETER)
+from config import DOWNLOAD_RELATION_GRID_CELL_EXPAND, DOWNLOAD_RELATION_WAY_BB_EXPAND, OVERPASS_API_INTERPRETER
 from models.bounding_box import BoundingBox
 from models.bounding_box_collection import BoundingBoxCollection
 from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId
-from models.fetch_relation import (FetchRelationBusStop,
-                                   FetchRelationBusStopCollection,
-                                   FetchRelationElement)
+from models.fetch_relation import FetchRelationBusStop, FetchRelationBusStopCollection, FetchRelationElement
 from utils import get_http_client
 from xmltodict_postprocessor import postprocessor
 
@@ -45,67 +43,54 @@ def split_by_count(elements: Iterable[dict]) -> list[list[dict]]:
 
 
 def build_bb_query(relation_id: int, timeout: int) -> str:
-    return \
-        f'[out:json][timeout:{timeout}];' \
-        f'rel({relation_id});' \
-        f'way(r);' \
-        f'out ids bb qt;'
+    return f'[out:json][timeout:{timeout}];rel({relation_id});way(r);out ids bb qt;'
 
 
 def build_bus_query(cell_bbs: Sequence[BoundingBox], cell_bbs_expanded: Sequence[BoundingBox], timeout: int) -> str:
-    return \
-        f'[out:json][timeout:{timeout}];' \
-        f'(' + \
-        ''.join(
-            f'way[highway][!footway]({bb});'
-            for bb in cell_bbs) + \
-        f');' \
-        f'out body qt;' \
-        f'out count;' \
-        f'>;' \
-        f'out skel qt;' \
-        f'out count;' + \
-        ''.join(
+    return (
+        f'[out:json][timeout:{timeout}];'
+        f'(' + ''.join(f'way[highway][!footway]({bb});' for bb in cell_bbs) + ');'
+        'out body qt;'
+        'out count;'
+        '>;'
+        'out skel qt;'
+        'out count;'
+        + ''.join(
             f'node[highway=bus_stop][public_transport=platform]({bb});'
             f'out tags center qt;'
             f'nwr[highway=platform][public_transport=platform]({bb});'
             f'out tags center qt;'
             f'node[public_transport=stop_position]({bb});'
             f'out tags center qt;'
-            for bb in cell_bbs_expanded) + \
-        f'out count;' \
-        f'(' + \
-        ''.join(
-            f'rel[public_transport=stop_area]({bb});'
-            for bb in cell_bbs_expanded) + \
-        f')->.r;' \
-        f'.r out body qt;' \
-        f'.r out count;' \
-        f'node(r.r:platform);' \
-        f'out tags center qt;' \
-        f'way(r.r:platform);' \
-        f'out tags center qt;' \
-        f'rel(r.r:platform);' \
-        f'out tags center qt;' \
-        f'out count;' \
-        f'node(r.r:stop);' \
-        f'out tags center qt;' \
-        f'out count;'
+            for bb in cell_bbs_expanded
+        )
+        + 'out count;'
+        '(' + ''.join(f'rel[public_transport=stop_area]({bb});' for bb in cell_bbs_expanded) + ')->.r;'
+        '.r out body qt;'
+        '.r out count;'
+        'node(r.r:platform);'
+        'out tags center qt;'
+        'way(r.r:platform);'
+        'out tags center qt;'
+        'rel(r.r:platform);'
+        'out tags center qt;'
+        'out count;'
+        'node(r.r:stop);'
+        'out tags center qt;'
+        'out count;'
+    )
 
 
 def build_parents_query(way_ids: Iterable[int], timeout: int) -> str:
     def _parents(way_id: int) -> str:
-        return \
-            f'way({way_id});' \
-            f'(rel(bw);.r;)->.r;'
+        return f'way({way_id});(rel(bw);.r;)->.r;'
 
-    return \
-        f'[out:xml][timeout:{timeout}];' \
-        f'._->.r;' + \
-        ''.join(_parents(way_id) for way_id in way_ids) + \
-        f'.r out meta qt;' \
-        f'way(r.r);' \
-        f'out skel qt;'
+    return (
+        f'[out:xml][timeout:{timeout}];'
+        f'._->.r;' + ''.join(_parents(way_id) for way_id in way_ids) + '.r out meta qt;'
+        'way(r.r);'
+        'out skel qt;'
+    )
 
 
 def is_road(tags: dict[str, str]) -> bool:
@@ -147,36 +132,24 @@ def is_road(tags: dict[str, str]) -> bool:
     if 'bus:conditional' in tags:
         access_designated = access_valid = True
     elif 'bus' in tags:
-        access_designated = access_valid = tags['bus'] not in {
-            'no'
-        }
+        access_designated = access_valid = tags['bus'] not in {'no'}
     elif 'psv' in tags:
-        access_designated = access_valid = tags['psv'] not in {
-            'no'
-        }
+        access_designated = access_valid = tags['psv'] not in {'no'}
     elif 'motor_vehicle' in tags:
-        access_valid = tags['motor_vehicle'] not in {
-            'private',
-            'customers',
-            'no'
-        }
+        access_valid = tags['motor_vehicle'] not in {'private', 'customers', 'no'}
     elif 'access' in tags:
-        access_valid = tags['access'] not in {
-            'private',
-            'customers',
-            'no'
-        }
+        access_valid = tags['access'] not in {'private', 'customers', 'no'}
 
-    noarea_valid = \
-        tags.get('area', 'no') in {
-            'no'
-        }
+    noarea_valid = tags.get('area', 'no') in {'no'}
 
-    return all((
-        (highway_valid or (highway_designated_valid and access_designated)),
-        (service_valid or access_designated),
-        access_valid,
-        noarea_valid))
+    return all(
+        (
+            (highway_valid or (highway_designated_valid and access_designated)),
+            (service_valid or access_designated),
+            access_valid,
+            noarea_valid,
+        )
+    )
 
 
 def is_oneway(tags: dict[str, str]) -> bool:
@@ -185,38 +158,26 @@ def is_oneway(tags: dict[str, str]) -> bool:
     roundabout_valid = False
 
     if 'junction' in tags:
-        roundabout_valid = tags['junction'] in {
-            'roundabout'
-        }
+        roundabout_valid = tags['junction'] in {'roundabout'}
 
     oneway_valid = roundabout_valid
 
     if 'oneway:bus' in tags:
-        oneway_valid = tags['oneway:bus'] in {
-            'yes'
-        }
+        oneway_valid = tags['oneway:bus'] in {'yes'}
     elif 'oneway:psv' in tags:
-        oneway_valid = tags['oneway:psv'] in {
-            'yes'
-        }
+        oneway_valid = tags['oneway:psv'] in {'yes'}
     elif 'oneway' in tags:
-        oneway_valid = tags['oneway'] in {
-            'yes'
-        }
+        oneway_valid = tags['oneway'] in {'yes'}
 
     return oneway_valid
 
 
 def is_roundabout(tags: dict[str, str]) -> bool:
-    return tags.get('junction', 'no') in {
-        'roundabout'
-    }
+    return tags.get('junction', 'no') in {'roundabout'}
 
 
 def is_bus_related(tags: dict[str, str]) -> bool:
-    bus_valid = tags.get('bus', 'no') in {
-        'yes'
-    }
+    bus_valid = tags.get('bus', 'no') in {'yes'}
 
     return bus_valid
 
@@ -224,23 +185,13 @@ def is_bus_related(tags: dict[str, str]) -> bool:
 def is_rail_related(tags: dict[str, str]) -> bool:
     rail_valid = 'railway' in tags
 
-    train_valid = tags.get('train', 'no') in {
-        'yes'
-    }
+    train_valid = tags.get('train', 'no') in {'yes'}
 
-    subway_valid = tags.get('subway', 'no') in {
-        'yes'
-    }
+    subway_valid = tags.get('subway', 'no') in {'yes'}
 
-    tram_valid = tags.get('tram', 'no') in {
-        'yes'
-    }
+    tram_valid = tags.get('tram', 'no') in {'yes'}
 
-    return any((
-        rail_valid,
-        train_valid,
-        subway_valid,
-        tram_valid))
+    return any((rail_valid, train_valid, subway_valid, tram_valid))
 
 
 def _merge_relation_tags(element: dict, relation: dict, extra: dict) -> None:
@@ -303,9 +254,10 @@ def organize_ways(ways: list[dict]) -> tuple[list[dict], dict[ElementId, set[Ele
             extraNum = extraNum if len(split_segments) > 1 else None
             maxNum = len(split_segments) if extraNum is not None else None
 
-            split_way = way | {
+            split_way = {
+                **way,
                 'id': ElementId(way['id'], extraNum=extraNum, maxNum=maxNum),
-                'nodes': segment
+                'nodes': segment,
             }
 
             split_ways.append(split_way)
@@ -334,7 +286,11 @@ def preprocess_elements(elements: Iterable[dict]) -> Sequence[dict]:
     return result
 
 
-def optimize_cells_and_get_bbs(cells: Sequence[Cell], *, start_horizontal: bool) -> tuple[Sequence[BoundingBox], Sequence[BoundingBox]]:
+def optimize_cells_and_get_bbs(
+    cells: Sequence[Cell],
+    *,
+    start_horizontal: bool,
+) -> tuple[Sequence[BoundingBox], Sequence[BoundingBox]]:
     def merge(sorted: list[tuple[int, int, int, int]]) -> list[tuple[int, int, int, int]]:
         result = []
         current = sorted[0]
@@ -379,7 +335,11 @@ def optimize_cells_and_get_bbs(cells: Sequence[Cell], *, start_horizontal: bool)
     return bbs, tuple(bb.extend(unit_degrees=DOWNLOAD_RELATION_GRID_CELL_EXPAND) for bb in bbs)
 
 
-def get_download_triggers(bbc: BoundingBoxCollection, cells: Sequence[Cell], ways: dict[ElementId, FetchRelationElement]) -> dict[ElementId, Sequence[tuple[int, int]]]:
+def get_download_triggers(
+    bbc: BoundingBoxCollection,
+    cells: Sequence[Cell],
+    ways: dict[ElementId, FetchRelationElement],
+) -> dict[ElementId, Sequence[tuple[int, int]]]:
     cells_set = frozenset(cells)
     result: dict[ElementId, Sequence[Cell]] = {}
 
@@ -391,9 +351,11 @@ def get_download_triggers(bbc: BoundingBoxCollection, cells: Sequence[Cell], way
                 continue
 
             new_cells = BoundingBox(
-                minlat=latLng[0], minlon=latLng[1],
-                maxlat=latLng[0], maxlon=latLng[1]) \
-                .get_grid_cells(expand=1)  # 3x3 grid
+                minlat=latLng[0],
+                minlon=latLng[1],
+                maxlat=latLng[0],
+                maxlon=latLng[1],
+            ).get_grid_cells(expand=1)  # 3x3 grid
 
             way_new_cells |= new_cells - cells_set
 
@@ -412,7 +374,12 @@ class Overpass:
         return get_http_client(OVERPASS_API_INTERPRETER)
 
     @cached(TTLCache(maxsize=1024, ttl=7200))  # 2 hours
-    async def _query_relation_history_post(self, session: str, query: str, timeout: float) -> list[list[dict]]:
+    async def _query_relation_history_post(
+        self,
+        session: str,
+        query: str,
+        timeout: float,
+    ) -> list[list[dict]]:
         async with self._get_http_client() as http:
             r = await http.post('', data={'data': query}, timeout=timeout * 2)
             r.raise_for_status()
@@ -420,7 +387,11 @@ class Overpass:
         elements: list[dict] = r.json()['elements']
         return split_by_count(elements)
 
-    async def _query_relation_history(self, relation_id: int, download_hist: DownloadHistory) -> tuple[list[list[dict]], BoundingBoxCollection]:
+    async def _query_relation_history(
+        self,
+        relation_id: int,
+        download_hist: DownloadHistory,
+    ) -> tuple[list[list[dict]], BoundingBoxCollection]:
         if not download_hist.history or not all(download_hist.history):
             raise ValueError('No grid cells to download')
 
@@ -453,7 +424,19 @@ class Overpass:
         return all_elements_split, bbc
 
     @cached(TTLCache(maxsize=128, ttl=60))
-    async def query_relation(self, relation_id: int, download_hist: DownloadHistory | None, download_targets: Sequence[Cell] | None) -> tuple[BoundingBox, DownloadHistory, dict[ElementId, Sequence[tuple[int, int]]], dict[ElementId, FetchRelationElement], dict[int, list[ElementId]], list[FetchRelationBusStopCollection]]:
+    async def query_relation(
+        self,
+        relation_id: int,
+        download_hist: DownloadHistory | None,
+        download_targets: Sequence[Cell] | None,
+    ) -> tuple[
+        BoundingBox,
+        DownloadHistory,
+        dict[ElementId, Sequence[tuple[int, int]]],
+        dict[ElementId, FetchRelationElement],
+        dict[int, list[ElementId]],
+        list[FetchRelationBusStopCollection],
+    ]:
         if download_targets is None:
             timeout = 60
             query = build_bb_query(relation_id, timeout)
@@ -468,14 +451,16 @@ class Overpass:
             union_grid_cells_set: set[Cell] = set()
 
             for way in elements:
-                union_grid_cells_set.update(BoundingBox(
-                    minlat=way['bounds']['minlat'],
-                    minlon=way['bounds']['minlon'],
-                    maxlat=way['bounds']['maxlat'],
-                    maxlon=way['bounds']['maxlon'],
-                )
+                union_grid_cells_set.update(
+                    BoundingBox(
+                        minlat=way['bounds']['minlat'],
+                        minlon=way['bounds']['minlon'],
+                        maxlat=way['bounds']['maxlat'],
+                        maxlon=way['bounds']['maxlon'],
+                    )
                     .extend(DOWNLOAD_RELATION_WAY_BB_EXPAND)
-                    .get_grid_cells())
+                    .get_grid_cells()
+                )
 
             union_grid_cells = tuple(union_grid_cells_set)
         else:
@@ -502,14 +487,20 @@ class Overpass:
         stop_area_platform_elements = elements_split[4]
         stop_area_stop_position_elements = elements_split[5]
 
-        merge_relations_tags(stop_area_relations, stop_area_platform_elements,
-                             role='platform', public_transport='platform')
-        merge_relations_tags(stop_area_relations, stop_area_stop_position_elements,
-                             role='stop', public_transport='stop_position')
+        merge_relations_tags(
+            stop_area_relations,
+            stop_area_platform_elements,
+            role='platform',
+            public_transport='platform',
+        )
+        merge_relations_tags(
+            stop_area_relations,
+            stop_area_stop_position_elements,
+            role='stop',
+            public_transport='stop_position',
+        )
 
-        road_elements = tuple(
-            e for e in maybe_road_elements
-            if is_road(e['tags']))
+        road_elements = tuple(e for e in maybe_road_elements if is_road(e['tags']))
 
         nodes_map = {e['id']: e for e in node_elements}
 
@@ -527,10 +518,7 @@ class Overpass:
                 oneway=e['_oneway'],
                 roundabout=e['_roundabout'],
                 nodes=e['nodes'],
-                latLngs=[
-                    (nodes_map[n_id]['lat'], nodes_map[n_id]['lon'])
-                    for n_id in e['nodes']
-                ],
+                latLngs=[(nodes_map[n_id]['lat'], nodes_map[n_id]['lon']) for n_id in e['nodes']],
                 connectedTo=list(connected_ways_map[e['id']]),
             )
             for e in road_elements
@@ -538,15 +526,11 @@ class Overpass:
 
         bus_elements_ex = chain(stop_area_platform_elements, stop_area_stop_position_elements, bus_elements)
         bus_elements_ex = preprocess_elements(bus_elements_ex)
-        bus_elements_ex = (
-            e for e in bus_elements_ex
-            if is_bus_related(e['tags']) or not is_rail_related(e['tags']))
+        bus_elements_ex = (e for e in bus_elements_ex if is_bus_related(e['tags']) or not is_rail_related(e['tags']))
 
         bus_stops = tuple(FetchRelationBusStop.from_data(e) for e in bus_elements_ex)
         bus_stop_collections = build_bus_stop_collections(bus_stops)
-        bus_stop_collections = tuple(
-            c for c in bus_stop_collections
-            if bbc.contains(c.best.latLng))
+        bus_stop_collections = tuple(c for c in bus_stop_collections if bbc.contains(c.best.latLng))
 
         global_bb = BoundingBox(*bbc.idx.bounds)
         download_triggers = get_download_triggers(bbc, union_grid_cells, ways)
@@ -565,7 +549,8 @@ class Overpass:
         data: dict[str, list[dict]] = xmltodict.parse(
             r.text,
             postprocessor=postprocessor,
-            force_list=('relation', 'way', 'member', 'tag', 'nd'))['osm']
+            force_list=('relation', 'way', 'member', 'tag', 'nd'),
+        )['osm']
 
         relations = data.get('relation', [])
         id_relations_map = defaultdict(list)
@@ -590,4 +575,5 @@ class Overpass:
 
         return QueryParentsResult(
             id_relations_map=id_relations_map,
-            ways_map=ways_map)
+            ways_map=ways_map,
+        )

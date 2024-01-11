@@ -1,9 +1,8 @@
 from collections import defaultdict
+from collections.abc import Generator, Sequence
 from itertools import combinations, repeat
 from math import radians
 from operator import itemgetter
-from pprint import pprint
-from typing import Generator, Sequence
 
 import networkx as nx
 import numpy as np
