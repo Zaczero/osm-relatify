@@ -43,23 +43,22 @@ let
     # Scripts
     # -- Cython
     (writeShellScriptBin "cython-build" ''
-      python "$PROJECT_DIR/setup.py" build_ext --build-lib "$PROJECT_DIR/cython_lib"
+      python setup.py build_ext --build-lib cython_lib
     '')
     (writeShellScriptBin "cython-clean" ''
-      rm -rf "$PROJECT_DIR/build/" "$PROJECT_DIR/cython_lib/"*{.c,.html,.so}
+      rm -rf build/ cython_lib/*{.c,.html,.so}
     '')
 
     # -- Misc
     (writeShellScriptBin "docker-build-push" ''
       set -e
       cython-clean && cython-build
+      if command -v podman &> /dev/null; then docker() { podman "$@"; } fi
       docker push $(docker load < $(nix-build --no-out-link) | sed -En 's/Loaded image: (\S+)/\1/p')
     '')
   ];
 
-  shell' = with pkgs; ''
-    export PROJECT_DIR="$(pwd)"
-  '' + lib.optionalString isDevelopment ''
+  shell' = with pkgs; lib.optionalString isDevelopment ''
     [ ! -e .venv/bin/python ] && [ -h .venv/bin/python ] && rm -r .venv
 
     echo "Installing Python dependencies"
