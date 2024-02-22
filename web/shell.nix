@@ -83,6 +83,7 @@ let
 
     echo "Installing Python dependencies"
     export POETRY_VIRTUALENVS_IN_PROJECT=1
+    poetry env use "${wrappedPython}/bin/python"
     poetry install --no-root --compile
 
     echo "Activating Python virtual environment"
@@ -93,6 +94,7 @@ let
     export SECRET="development-secret"
 
     if [ -f .env ]; then
+      echo "Loading .env file"
       set -o allexport
       source .env set
       +o allexport
