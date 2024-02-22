@@ -1,7 +1,7 @@
 export const haversine_distance = (latLng1, latLng2) => {
     const R = 6371000 // metres
 
-    const toRadians = (degrees) => degrees * Math.PI / 180
+    const toRadians = (degrees) => (degrees * Math.PI) / 180
 
     const φ1 = toRadians(latLng1[0]) // φ, λ in radians
     const φ2 = toRadians(latLng2[0])
@@ -14,26 +14,25 @@ export const haversine_distance = (latLng1, latLng2) => {
     return R * c // in metres
 }
 
-export const createElementFromHTML = html => {
+export const createElementFromHTML = (html) => {
     let body = undefined
 
     html = html.trim()
 
-    if (html.startsWith('<tr'))
-        body = document.createElement('tbody')
-    else
-        body = document.createElement('div')
+    if (html.startsWith("<tr")) body = document.createElement("tbody")
+    else body = document.createElement("div")
 
     body.innerHTML = html
     return body.firstChild
 }
 
-export const deflateCompress = async data => {
-    if (typeof data !== 'string')
+export const deflateCompress = async (data) => {
+    if (typeof data !== "string") {
         data = JSON.stringify(data)
+    }
 
     const encoder = new TextEncoder()
-    const compressionStream = new CompressionStream('deflate-raw')
+    const compressionStream = new CompressionStream("deflate-raw")
 
     const writer = compressionStream.writable.getWriter()
     writer.write(encoder.encode(data))
@@ -41,23 +40,22 @@ export const deflateCompress = async data => {
 
     const reader = compressionStream.readable.getReader()
 
-    let chunks = []
+    const chunks = []
     let totalLength = 0
 
     while (true) {
         const { done, value } = await reader.read()
 
-        if (done)
-            break
+        if (done) break
 
         chunks.push(value)
         totalLength += value.length
     }
 
-    let concatenatedChunks = new Uint8Array(totalLength)
+    const concatenatedChunks = new Uint8Array(totalLength)
     let position = 0
 
-    for (let chunk of chunks) {
+    for (const chunk of chunks) {
         concatenatedChunks.set(chunk, position)
         position += chunk.length
     }
@@ -65,9 +63,8 @@ export const deflateCompress = async data => {
     return concatenatedChunks
 }
 
-
-export const deflateDecompress = async data => {
-    const decompressionStream = new DecompressionStream('deflate-raw')
+export const deflateDecompress = async (data) => {
+    const decompressionStream = new DecompressionStream("deflate-raw")
 
     const writer = decompressionStream.writable.getWriter()
     writer.write(data)
@@ -75,23 +72,22 @@ export const deflateDecompress = async data => {
 
     const reader = decompressionStream.readable.getReader()
 
-    let chunks = []
+    const chunks = []
     let totalLength = 0
 
     while (true) {
         const { done, value } = await reader.read()
 
-        if (done)
-            break
+        if (done) break
 
         chunks.push(value)
         totalLength += value.length
     }
 
-    let concatenatedChunks = new Uint8Array(totalLength)
+    const concatenatedChunks = new Uint8Array(totalLength)
     let position = 0
 
-    for (let chunk of chunks) {
+    for (const chunk of chunks) {
         concatenatedChunks.set(chunk, position)
         position += chunk.length
     }
@@ -101,15 +97,13 @@ export const deflateDecompress = async data => {
     return JSON.parse(json)
 }
 
-export const getBusCollectionName = collection => {
-    const displayName = stop => {
-        if (!stop)
-            return ''
+export const getBusCollectionName = (collection) => {
+    const displayName = (stop) => {
+        if (!stop) return ""
 
-        let result = ''
+        let result = ""
 
-        if (stop.tags.ref)
-            result += `<small><i>${stop.tags.ref}</i></small> `
+        if (stop.tags.ref) result += `<small><i>${stop.tags.ref}</i></small> `
 
         return (result + stop.name).trim()
     }
@@ -117,5 +111,5 @@ export const getBusCollectionName = collection => {
     const platformName = displayName(collection.platform)
     const stopName = displayName(collection.stop)
     const longestDisplayName = platformName.length >= stopName.length ? platformName : stopName
-    return longestDisplayName || '<i>Unnamed</i>'
+    return longestDisplayName || "<i>Unnamed</i>"
 }

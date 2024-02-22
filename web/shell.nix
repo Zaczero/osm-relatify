@@ -51,6 +51,7 @@ let
     # Development packages
     poetry
     ruff
+    biome
     gcc
 
     # Scripts

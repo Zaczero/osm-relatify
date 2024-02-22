@@ -10,7 +10,7 @@ function getInitialMapView() {
         return [parseFloat(lat), parseFloat(lng), parseInt(zoom, 10)]
     }
 
-    return [52.2320, 21.0068, 6]  // default view
+    return [52.232, 21.0068, 6] // default view
 }
 
 const [defaultLat, defaultLng, defaultZoom] = getInitialMapView()
@@ -19,7 +19,7 @@ export const canvasRenderer = L.canvas({
     padding: 0,
 })
 
-export const map = L.map('map', {
+export const map = L.map("map", {
     center: [defaultLat, defaultLng],
     zoom: defaultZoom,
     zoomControl: false,
@@ -32,21 +32,20 @@ export function getLocationHash() {
     return `map=${zoom}/${center.lat.toFixed(6)}/${center.lng.toFixed(6)}`
 }
 
-export const openInOpenStreetMap = path => {
-    if (!path)
-        path = ''
+export const openInOpenStreetMap = (path) => {
+    if (!path) path = ""
 
-    window.open(`https://www.openstreetmap.org/${path}#${getLocationHash()}`, '_blank')
+    window.open(`https://www.openstreetmap.org/${path}#${getLocationHash()}`, "_blank")
 }
 
 function updateUrl() {
     window.location.hash = getLocationHash()
 }
 
-map.on('moveend', updateUrl)
-map.on('zoomend', updateUrl)
+map.on("moveend", updateUrl)
+map.on("zoomend", updateUrl)
 
-map.on('contextmenu', function (e) {
+map.on("contextmenu", (e) => {
     // prevent default right-click context menu from appearing
     // this is not to hide anything, it's just for convenience
     e.originalEvent.preventDefault()
@@ -55,40 +54,34 @@ map.on('contextmenu', function (e) {
 // map tiles
 const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 const baseLayers = {
-    'OpenStreetMap': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    OpenStreetMap: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: attribution,
         maxZoom: 19,
     }),
-    'OpenStreetMap DE': L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+    "OpenStreetMap DE": L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png", {
         attribution: attribution,
         maxZoom: 19,
     }),
 }
 
-const selectedBaseLayer = localStorage.getItem('baseLayer')
+const selectedBaseLayer = localStorage.getItem("baseLayer")
 
-if (selectedBaseLayer in baseLayers)
-    baseLayers[selectedBaseLayer].addTo(map)
-else
-    baseLayers['OpenStreetMap'].addTo(map)
+if (selectedBaseLayer in baseLayers) baseLayers[selectedBaseLayer].addTo(map)
+else baseLayers.OpenStreetMap.addTo(map)
 
 L.control.layers(baseLayers).addTo(map)
 
-map.on('baselayerchange', e => {
-    localStorage.setItem('baseLayer', e.name)
+map.on("baselayerchange", (e) => {
+    localStorage.setItem("baseLayer", e.name)
 })
 
 // map controls
-L.control.zoom({ position: 'topright' }).addTo(map)
+L.control.zoom({ position: "topright" }).addTo(map)
 L.control.scale().addTo(map)
 
 // open in openstreetmap
 class OsmButton extends L.Control {
-    constructor(options) {
-        super(options)
-    }
-
-    onAdd = map => {
+    onAdd = () => {
         const div = createElementFromHTML(`
             <div class="leaflet-bar leaflet-control leaflet-control-custom" title="Open in OpenStreetMap">
                 <a href="javascript:;">
@@ -102,15 +95,11 @@ class OsmButton extends L.Control {
     }
 }
 
-new OsmButton({ position: 'topright' }).addTo(map)
+new OsmButton({ position: "topright" }).addTo(map)
 
 // data download progress
 class DownloadBar extends L.Control {
-    constructor(options) {
-        super(options)
-    }
-
-    onAdd = map => {
+    onAdd = () => {
         const div = createElementFromHTML(`
             <div id="download-bar" class="leaflet-bar leaflet-control leaflet-control-custom download-bar d-none">
                 <p class="mb-0">Downloading map data...</p>
@@ -123,12 +112,12 @@ class DownloadBar extends L.Control {
     }
 }
 
-new DownloadBar({ position: 'bottomright' }).addTo(map)
+new DownloadBar({ position: "bottomright" }).addTo(map)
 
 export const showDownloadBar = () => {
-    document.getElementById('download-bar').classList.remove('d-none')
+    document.getElementById("download-bar").classList.remove("d-none")
 }
 
 export const hideDownloadBar = () => {
-    document.getElementById('download-bar').classList.add('d-none')
+    document.getElementById("download-bar").classList.add("d-none")
 }

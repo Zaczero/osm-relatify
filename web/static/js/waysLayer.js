@@ -1,18 +1,18 @@
-import { updateBusStopsVisibility } from './busStopsLayer.js'
-import { downloadTrigger } from './downloadTriggers.js'
-import { canvasRenderer, map } from './map.js'
-import { showContextMenu, startWay, stopWay } from './waysEndpoint.js'
-import { requestCalcBusRoute } from './waysRoute.js'
+import { updateBusStopsVisibility } from "./busStopsLayer.js"
+import { downloadTrigger } from "./downloadTriggers.js"
+import { canvasRenderer, map } from "./map.js"
+import { showContextMenu, startWay, stopWay } from "./waysEndpoint.js"
+import { requestCalcBusRoute } from "./waysRoute.js"
 
 export let waysData = null
 export let waysRBush = null
 
-map.createPane('nonMemberBuffers').style.zIndex = 394
-map.createPane('memberBuffers').style.zIndex = 395
-map.createPane('nonMemberBuffers2').style.zIndex = 396
-map.createPane('memberBuffers2').style.zIndex = 397
-map.createPane('nonMemberWays').style.zIndex = 398
-map.createPane('memberWays').style.zIndex = 399
+map.createPane("nonMemberBuffers").style.zIndex = 394
+map.createPane("memberBuffers").style.zIndex = 395
+map.createPane("nonMemberBuffers2").style.zIndex = 396
+map.createPane("memberBuffers2").style.zIndex = 397
+map.createPane("nonMemberWays").style.zIndex = 398
+map.createPane("memberWays").style.zIndex = 399
 
 const waysLayer = L.layerGroup().addTo(map)
 
@@ -26,45 +26,38 @@ export function processRelationWaysData(fetchData) {
             if (waysData) {
                 for (const way of Object.values(waysData)) {
                     memberMap.set(way.id, way.member)
-                    memberMap.set(way.id.split('_')[0], way.member)
+                    memberMap.set(way.id.split("_")[0], way.member)
                 }
             }
 
             waysData = fetchData.ways
 
             for (const way of Object.values(waysData)) {
-                const memberCandidates = [
-                    memberMap.get(way.id),
-                    memberMap.get(way.id.split('_')[0]),
-                ]
+                const memberCandidates = [memberMap.get(way.id), memberMap.get(way.id.split("_")[0])]
 
-                way.member = memberCandidates.find(m => m !== undefined) || false
+                way.member = memberCandidates.find((m) => m !== undefined) || false
             }
-        }
-        else {
+        } else {
             waysData = fetchData.ways
         }
-    }
-    else
-        waysData = null
+    } else waysData = null
 
     onWaysDataChanged()
 
-    if (waysData && (!fetchData || !fetchData.fetchMerge))
+    if (waysData && !fetchData?.fetchMerge) {
         fitToBounds(fetchData.bounds)
+    }
 }
 
 function createWaysRBush() {
-    if (!waysData)
-        return null
+    if (!waysData) return null
 
     const maxDistanceMeters = 250
     const maxDistance = maxDistanceMeters / 111111
     const segmentBoundingBoxes = []
 
     for (const way of Object.values(waysData)) {
-        if (!way.member)
-            continue
+        if (!way.member) continue
 
         for (let i = 0; i < way.latLngs.length - 1; i++) {
             const start = way.latLngs[i]
@@ -105,58 +98,60 @@ function updateWaysVisibility() {
     const visibleWays = new Set()
 
     for (const way of Object.values(waysData)) {
-        if (!way.member)
-            continue
+        if (!way.member) continue
 
         // add the way itself ..
         visibleWays.add(way.id)
 
         // .. and all the ways it is connected to
-        for (const connectedWayId of way.connectedTo)
+        for (const connectedWayId of way.connectedTo) {
             visibleWays.add(connectedWayId)
+        }
     }
 
-    for (const wayId of visibleWays)
+    for (const wayId of visibleWays) {
         addWay(waysData[wayId])
+    }
 
-    for (const wayId of idGroupMap.keys())
-        if (!visibleWays.has(wayId))
+    for (const wayId of idGroupMap.keys()) {
+        if (!visibleWays.has(wayId)) {
             removeGroupFromLayers(wayId)
+        }
+    }
 }
 
-const addWay = way => {
-    if (idGroupMap.has(way.id))
-        return
+const addWay = (way) => {
+    if (idGroupMap.has(way.id)) return
 
-    const lineColor = way.member ? 'orangered' : '#909090'
-    const lineHoverColor = way.member ? 'darkred' : '#4C4C4C'
+    const lineColor = way.member ? "orangered" : "#909090"
+    const lineHoverColor = way.member ? "darkred" : "#4C4C4C"
     const lineWeight = way.member ? 7 : 5
 
     const line = L.polyline(way.latLngs, {
         renderer: canvasRenderer,
         color: lineColor,
         weight: lineWeight,
-        pane: way.member ? 'memberWays' : 'nonMemberWays',
+        pane: way.member ? "memberWays" : "nonMemberWays",
     })
 
     const buffer = L.polyline(way.latLngs, {
         renderer: canvasRenderer,
-        color: 'transparent',
+        color: "transparent",
         weight: lineWeight + 18,
-        pane: way.member ? 'memberBuffers' : 'nonMemberBuffers',
+        pane: way.member ? "memberBuffers" : "nonMemberBuffers",
     })
 
     const buffer2 = L.polyline(way.latLngs, {
         renderer: canvasRenderer,
-        color: 'transparent',
+        color: "transparent",
         weight: lineWeight + 9,
-        pane: way.member ? 'memberBuffers2' : 'nonMemberBuffers2',
+        pane: way.member ? "memberBuffers2" : "nonMemberBuffers2",
     })
 
     if (way.oneway) {
         line.arrowheads({
-            size: Math.min(15, way.length * .6) + 'm',
-            frequency: way.length > 40 ? '40m' : 'endonly',
+            size: `${Math.min(15, way.length * 0.6)}m`,
+            frequency: way.length > 40 ? "40m" : "endonly",
             yawn: 40,
             stroke: false,
             fill: true,
@@ -167,8 +162,7 @@ const addWay = way => {
     const group = [line, buffer, buffer2]
 
     const onClickHandler = () => {
-        if (way.id === startWay.id || way.id === stopWay.id)
-            return
+        if (way.id === startWay.id || way.id === stopWay.id) return
 
         const newMember = !way.member
 
@@ -176,21 +170,20 @@ const addWay = way => {
         removeGroupFromLayers(way.id)
         onWaysDataChanged()
 
-        if (newMember)
-            downloadTrigger(way.id)
+        if (newMember) downloadTrigger(way.id)
     }
 
     const onMouseOverHandler = () => {
         line.setStyle({
             color: lineHoverColor,
-            weight: lineWeight + 2
+            weight: lineWeight + 2,
         })
     }
 
     const onMouseOutHandler = () => {
         line.setStyle({
             color: lineColor,
-            weight: lineWeight
+            weight: lineWeight,
         })
     }
 
@@ -199,21 +192,19 @@ const addWay = way => {
     }
 
     for (const e of group) {
-        e.on('click', onClickHandler)
-        e.on('mouseover', onMouseOverHandler)
-        e.on('mouseout', onMouseOutHandler)
+        e.on("click", onClickHandler)
+        e.on("mouseover", onMouseOverHandler)
+        e.on("mouseout", onMouseOutHandler)
 
-        if (way.member)
-            e.on('contextmenu', onContextMenuHandler)
+        if (way.member) e.on("contextmenu", onContextMenuHandler)
     }
 
     addGroupToLayers(way.id, group)
 }
 
-export const removeMembersList = wayIds => {
+export const removeMembersList = (wayIds) => {
     for (const wayId of wayIds) {
-        if (wayId === startWay.id || wayId === stopWay.id)
-            continue
+        if (wayId === startWay.id || wayId === stopWay.id) continue
 
         waysData[wayId].member = false
         removeGroupFromLayers(wayId)
@@ -223,8 +214,7 @@ export const removeMembersList = wayIds => {
 }
 
 const addGroupToLayers = (id, group) => {
-    if (idGroupMap.has(id))
-        return
+    if (idGroupMap.has(id)) return
 
     const [line, buffer, buffer2] = group
 
@@ -235,9 +225,8 @@ const addGroupToLayers = (id, group) => {
     idGroupMap.set(id, group)
 }
 
-const removeGroupFromLayers = id => {
-    if (!idGroupMap.has(id))
-        return
+const removeGroupFromLayers = (id) => {
+    if (!idGroupMap.has(id)) return
 
     const [line, buffer, buffer2] = idGroupMap.get(id)
 

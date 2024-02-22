@@ -1,5 +1,5 @@
-import { map, openInOpenStreetMap } from './map.js'
-import { requestCalcBusRoute } from './waysRoute.js'
+import { map, openInOpenStreetMap } from "./map.js"
+import { requestCalcBusRoute } from "./waysRoute.js"
 
 let startMarker = null
 let stopMarker = null
@@ -20,13 +20,11 @@ export function processRelationEndpointData(fetchData) {
                 setStopMarker(null)
                 clearPopup()
             }
-        }
-        else {
+        } else {
             setStartMarker(fetchData.startWay)
             setStopMarker(fetchData.stopWay)
         }
-    }
-    else {
+    } else {
         setStartMarker(null)
         setStopMarker(null)
         clearPopup()
@@ -37,7 +35,7 @@ function createEndpointIcon(iconUrl) {
     const size = 24
 
     return L.icon({
-        className: 'endpoint-icon',
+        className: "endpoint-icon",
         iconUrl: iconUrl,
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
@@ -58,8 +56,8 @@ function setStartMarker(way) {
 
     if (startWay) {
         startMarker = L.marker(way.midpoint, {
-            icon: createEndpointIcon('/static/img/start.webp'),
-            interactive: false
+            icon: createEndpointIcon("/static/img/start.webp"),
+            interactive: false,
         }).addTo(map)
     }
 
@@ -76,8 +74,8 @@ function setStopMarker(way) {
 
     if (stopWay) {
         stopMarker = L.marker(way.midpoint, {
-            icon: createEndpointIcon('/static/img/finish.webp'),
-            interactive: false
+            icon: createEndpointIcon("/static/img/finish.webp"),
+            interactive: false,
         }).addTo(map)
     }
 
@@ -111,12 +109,12 @@ export function showContextMenu(e, way) {
                 </button>
             </div>`,
         closeButton: false,
-        className: 'popup-sm'
+        className: "popup-sm",
     }).openOn(map)
 
-    const setStartButton = document.getElementById('ep-set-start')
-    const setStopButton = document.getElementById('ep-set-stop')
-    const openOsmButton = document.getElementById('ep-open-osm')
+    const setStartButton = document.getElementById("ep-set-start")
+    const setStopButton = document.getElementById("ep-set-stop")
+    const openOsmButton = document.getElementById("ep-open-osm")
 
     setStartButton.onclick = () => {
         setStartMarker(way)
@@ -129,7 +127,7 @@ export function showContextMenu(e, way) {
     }
 
     openOsmButton.onclick = () => {
-        const id = way.id.split('_')[0]
+        const id = way.id.split("_")[0]
         openInOpenStreetMap(`way/${id}`)
         popup.close()
     }
