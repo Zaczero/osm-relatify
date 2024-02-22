@@ -1,6 +1,9 @@
 import os
 import secrets
 
+import sentry_sdk
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+
 SECRET = os.getenv('SECRET', None)
 
 if not SECRET:
@@ -12,6 +15,11 @@ WEBSITE = os.getenv('WEBSITE', 'https://github.com/Zaczero/osm-relatify')
 VERSION = '1.2.4'
 CREATED_BY = f'osm-relatify {VERSION}'
 USER_AGENT = f'osm-relatify/{VERSION} (+https://github.com/Zaczero/osm-relatify)'
+
+TEST_ENV = os.getenv('TEST_ENV', '0').strip().lower() in ('1', 'true', 'yes')
+
+if TEST_ENV:
+    print('[CONF] Running in test environment')
 
 # Dedicated instance unavailable? Pick one from the public list:
 # https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances
@@ -47,3 +55,16 @@ print(f'[CONF] {DOWNLOAD_RELATION_GRID_CELL_EXPAND * 111_111 = :.0f} meters')
 BUS_COLLECTION_SEARCH_AREA = 50  # meters
 
 assert DOWNLOAD_RELATION_GRID_CELL_EXPAND * 111_111 > BUS_COLLECTION_SEARCH_AREA * 2
+
+if not TEST_ENV:
+    sentry_sdk.init(
+        dsn='https://c422e6b64cb26f14a45b26ea04f74c73@sentry.monicz.dev/4',
+        release=VERSION,
+        enable_tracing=True,
+        traces_sample_rate=0.2,
+        trace_propagation_targets=None,
+        profiles_sample_rate=0.2,
+        integrations=[
+            AsyncioIntegration(),
+        ],
+    )

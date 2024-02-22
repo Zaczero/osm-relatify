@@ -89,6 +89,7 @@ let
     source .venv/bin/activate
 
     # Development environment variables
+    export TEST_ENV=1
     export SECRET="development-secret"
 
     if [ -f .env ]; then
