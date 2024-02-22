@@ -10,7 +10,7 @@ from sklearn.neighbors import BallTree
 
 from config import CHANGESET_ID_PLACEHOLDER, CREATED_BY
 from cython_lib.geoutils import haversine_distance, radians_tuple
-from models.element_id import ElementId, split_element_id
+from models.element_id import ElementId, element_id, split_element_id
 from models.fetch_relation import FetchRelationBusStopCollection, FetchRelationElement
 from models.final_route import FinalRoute
 from models.relation_member import RelationMember
@@ -129,17 +129,17 @@ def _simplify_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
     while i < len(way_ids_parts):
         way_id, way_id_parts = way_ids[i], way_ids_parts[i]
 
-        if way_id_parts.extraNum == 1 or (
-            way_id_parts.extraNum is not None and way_id_parts.extraNum == way_id_parts.maxNum
+        if way_id_parts.extra_num == 1 or (
+            way_id_parts.extra_num is not None and way_id_parts.extra_num == way_id_parts.max_num
         ):
-            last_i = i + way_id_parts.maxNum - 1
+            last_i = i + way_id_parts.max_num - 1
 
             if last_i < len(way_ids):
                 if all(
                     other_way_id_parts.id == way_id_parts.id for other_way_id_parts in way_ids_parts[i + 1 : last_i + 1]
                 ):
                     # simplify
-                    i += way_id_parts.maxNum
+                    i += way_id_parts.max_num
                     continue
                 else:
                     simplify_blacklist.add(way_id_parts.id)
@@ -156,10 +156,10 @@ def _simplify_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
         way_id, way_id_parts = way_ids[i], way_ids_parts[i]
 
         if way_id_parts.id not in simplify_blacklist:
-            if way_id_parts.extraNum == 1 or (
-                way_id_parts.extraNum is not None and way_id_parts.extraNum == way_id_parts.maxNum
+            if way_id_parts.extra_num == 1 or (
+                way_id_parts.extra_num is not None and way_id_parts.extra_num == way_id_parts.max_num
             ):
-                last_i = i + way_id_parts.maxNum - 1
+                last_i = i + way_id_parts.max_num - 1
 
                 if last_i < len(way_ids):
                     if all(
@@ -167,8 +167,8 @@ def _simplify_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
                         for other_way_id_parts in way_ids_parts[i + 1 : last_i + 1]
                     ):
                         # simplify
-                        result.append(ElementId(way_id_parts.id))
-                        i += way_id_parts.maxNum
+                        result.append(element_id(way_id_parts.id))
+                        i += way_id_parts.max_num
                         continue
 
         result.append(way_id)
@@ -178,7 +178,7 @@ def _simplify_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
 
 
 def get_relation_members(relation: dict) -> list[RelationMember]:
-    return [RelationMember(id=ElementId(m['ref']), type=m['type'], role=m['role']) for m in relation['members']]
+    return [RelationMember(id=element_id(m['ref']), type=m['type'], role=m['role']) for m in relation['members']]
 
 
 def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationMember]) -> FinalRoute:
@@ -421,12 +421,12 @@ async def build_osm_change(
         element_id = obj.id
         element_id_parts = split_element_id(element_id)
 
-        if element_id_parts.extraNum is not None:
+        if element_id_parts.extra_num is not None:
             split_ways.add(element_id_parts.id)
-            native_id_element_ids_map[element_id_parts.id][element_id_parts.extraNum] = element_id
+            native_id_element_ids_map[element_id_parts.id][element_id_parts.extra_num] = element_id
 
             if element_id not in element_id_unique_map:
-                if element_id_parts.extraNum == 1:
+                if element_id_parts.extra_num == 1:
                     element_id_unique_map[element_id] = element_id_parts.id
                 else:
                     element_id_unique_map[element_id] = next_unique_id
@@ -438,7 +438,7 @@ async def build_osm_change(
 
     for group in native_id_element_ids_map.values():
         assert (
-            len(group) == split_element_id(group[1]).maxNum
+            len(group) == split_element_id(group[1]).max_num
         ), f'Split ways are not complete: {", ".join(f"{k}={v}" for k, v in group.items())}'
 
     split_ways = frozenset(split_ways)
@@ -466,12 +466,12 @@ async def build_osm_change(
             way_data.pop('@uid', None)
 
             # perform splits
-            for extraNum, element_id in native_id_element_ids_map[way_id].items():
+            for extra_num, element_id in native_id_element_ids_map[way_id].items():
                 element_way = id_way_map[element_id]
 
                 new_data = way_data.copy()
 
-                if extraNum == 1:
+                if extra_num == 1:
                     action = 'modify'
                 else:
                     action = 'create'

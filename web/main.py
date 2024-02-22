@@ -3,14 +3,14 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, replace
 from itertools import chain
 
-import orjson
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from dacite import Config, from_dict
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import ORJSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx import HTTPStatusError
+from msgspec.json import Decoder, Encoder
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.websockets import WebSocketState
@@ -40,7 +40,7 @@ from models.fetch_relation import (
     find_start_stop_ways,
 )
 from models.final_route import FinalRoute, WarningSeverity
-from openstreetmap import OpenStreetMap, UploadResult
+from openstreetmap import OpenStreetMap
 from overpass import Overpass
 from relation_builder import build_osm_change, get_relation_members, sort_and_upgrade_members
 from route_warnings import check_for_issues
@@ -49,7 +49,10 @@ from utils import print_run_time
 
 INDEX_REDIRECT = RedirectResponse('/', status_code=status.HTTP_302_FOUND)
 
-app = FastAPI(default_response_class=ORJSONResponse)
+_json_decode = Decoder().decode
+_json_encode = Encoder(decimal_format='number').encode
+
+app = FastAPI()
 app.router.route_class = DeflateRoute
 app.add_middleware(SessionMiddleware, secret_key=SECRET, max_age=31536000)  # 1 year
 app.mount('/static', StaticFiles(directory='static', html=True), name='static')
@@ -70,7 +73,7 @@ async def index(request: Request, user=Depends(fetch_user_details)):
 
 
 @app.post('/login')
-async def login(request: Request) -> RedirectResponse:
+async def login(request: Request):
     async with AsyncOAuth2Client(
         client_id=OSM_CLIENT,
         scope=OSM_SCOPES,
@@ -83,7 +86,7 @@ async def login(request: Request) -> RedirectResponse:
 
 
 @app.get('/callback')
-async def callback(request: Request) -> RedirectResponse:
+async def callback(request: Request):
     state = request.session.pop('oauth_state', None)
 
     if state is None:
@@ -106,7 +109,7 @@ async def callback(request: Request) -> RedirectResponse:
 
 
 @app.post('/logout')
-def logout(_=Depends(unset_user_token)) -> RedirectResponse:
+def logout(_=Depends(unset_user_token)):
     return INDEX_REDIRECT
 
 
@@ -211,7 +214,7 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
         while True:
             body = await ws.receive_bytes()
             body = deflate_decompress(body)
-            json = orjson.loads(body)
+            json: dict = _json_decode(body)
             model = from_dict(
                 PostCalcBusRouteModel,
                 json,
@@ -272,7 +275,7 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
                 relation_members=relation_members,
             )
 
-            body = orjson.dumps(final_route, option=orjson.OPT_NON_STR_KEYS)
+            body = _json_encode(final_route)
             body = deflate_compress(body)
             await ws.send_bytes(body)
     except WebSocketDisconnect:
@@ -328,7 +331,7 @@ async def post_download_osm_change(model: PostDownloadOsmChangeModel, _=Depends(
 
 
 @app.post('/upload_osm')
-async def post_upload_osm(model: PostDownloadOsmChangeModel, token=Depends(require_user_token)) -> UploadResult:
+async def post_upload_osm(model: PostDownloadOsmChangeModel, token=Depends(require_user_token)):
     print(f'🌐 Uploading OSM change ({model.relationId})')
 
     route = from_dict(

@@ -7,7 +7,7 @@ from typing import Self
 from cython_lib.geoutils import haversine_distance
 from models.bounding_box import BoundingBox
 from models.download_history import Cell, DownloadHistory
-from models.element_id import ElementId
+from models.element_id import ElementId, element_id
 from utils import normalize_name
 
 
@@ -60,7 +60,7 @@ class FetchRelationElement:  # more like FetchRelationWay
             self.length, self.midpoint = _calculate_length_and_midpoint(self.latLngs)
 
 
-class PublicTransport(Enum):
+class PublicTransport(str, Enum):
     PLATFORM = 'platform'
     STOP_POSITION = 'stop_position'
 
@@ -99,7 +99,7 @@ class FetchRelationBusStop:
         group_name = normalize_name(name, lower=True, special=True, number=True)
 
         return cls(
-            id=ElementId(data['id']),
+            id=element_id(data['id']),
             type=data['type'],
             member=None,
             latLng=(data['lat'], data['lon']),
@@ -213,7 +213,7 @@ def assign_none_members(
 
     # 1 pass: assign platform as a member for any platform
     for member in relation['members']:
-        typed_id = (member['type'], ElementId(member['ref']))
+        typed_id = (member['type'], element_id(member['ref']))
 
         # != 1 because platforms should not be reused by multiple collections
         # see bus_collection_builder: element_reuse
@@ -232,7 +232,7 @@ def assign_none_members(
     # 2 pass: assign stop as a member for stop w/o platform
     # reason: platform and stop may be miss-matched and belong to different collections
     for member in relation['members']:
-        typed_id = (member['type'], ElementId(member['ref']))
+        typed_id = (member['type'], element_id(member['ref']))
 
         # collections may share the same stop
         # it's safe to use stop as a member indicator

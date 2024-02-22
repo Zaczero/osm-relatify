@@ -120,6 +120,6 @@ def check_for_issues(
         _check_for_members_unchanged(route, relation_members),
     ]
 
-    sorted_warnings = tuple(sorted(filter(None, warnings), key=lambda warning: warning.severity.value[1], reverse=True))
+    sorted_warnings = tuple(sorted(filter(None, warnings), key=lambda warning: warning.severity.value, reverse=True))
 
     return replace(route, warnings=sorted_warnings)

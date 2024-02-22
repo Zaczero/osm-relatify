@@ -14,7 +14,7 @@ from config import DOWNLOAD_RELATION_GRID_CELL_EXPAND, DOWNLOAD_RELATION_WAY_BB_
 from models.bounding_box import BoundingBox
 from models.bounding_box_collection import BoundingBoxCollection
 from models.download_history import Cell, DownloadHistory
-from models.element_id import ElementId
+from models.element_id import ElementId, element_id
 from models.fetch_relation import FetchRelationBusStop, FetchRelationBusStopCollection, FetchRelationElement
 from utils import get_http_client
 from xmltodict_postprocessor import postprocessor
@@ -250,13 +250,13 @@ def organize_ways(ways: list[dict]) -> tuple[list[dict], dict[ElementId, set[Ele
     for way in ways:
         split_segments = _split_way_on_intersection(way, node_counts)
 
-        for extraNum, segment in enumerate(split_segments, 1):
-            extraNum = extraNum if len(split_segments) > 1 else None
-            maxNum = len(split_segments) if extraNum is not None else None
+        for extra_num, segment in enumerate(split_segments, 1):
+            extra_num = extra_num if len(split_segments) > 1 else None
+            max_num = len(split_segments) if extra_num is not None else None
 
             split_way = {
                 **way,
-                'id': ElementId(way['id'], extraNum=extraNum, maxNum=maxNum),
+                'id': element_id(way['id'], extra_num=extra_num, max_num=max_num),
                 'nodes': segment,
             }
 

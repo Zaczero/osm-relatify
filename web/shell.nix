@@ -2,8 +2,8 @@
 
 let
   # Currently using nixpkgs-23.11-darwin
-  # Get latest hashes from https://status.nixos.org/
-  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/66b333426654b140717cc5594a7210c4b95890f5.tar.gz") { };
+  # Update with `nixpkgs-update` command
+  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/700804df18b73e2fe360d950f371aaec1691dea2.tar.gz") { };
 
   libraries' = with pkgs; [
     # Base libraries
@@ -11,9 +11,22 @@ let
     zlib.out
   ];
 
+  # Wrap Python to override LD_LIBRARY_PATH
+  wrappedPython = with pkgs; (symlinkJoin {
+    name = "python";
+    paths = [
+      # Enable Python optimizations when in production
+      (if isDevelopment then python312 else python312.override { enableOptimizations = true; })
+    ];
+    buildInputs = [ makeWrapper ];
+    postBuild = ''
+      wrapProgram "$out/bin/python3.12" --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath libraries'}"
+    '';
+  });
+
   packages' = with pkgs; [
     # Base packages
-    python312
+    wrappedPython
     esbuild
 
     # Scripts
@@ -50,6 +63,12 @@ let
     '')
 
     # -- Misc
+    (writeShellScriptBin "nixpkgs-update" ''
+      set -e
+      hash=$(git ls-remote https://github.com/NixOS/nixpkgs nixpkgs-23.11-darwin | cut -f 1)
+      sed -i -E "s|/nixpkgs/archive/[0-9a-f]{40}\.tar\.gz|/nixpkgs/archive/$hash.tar.gz|" shell.nix
+      echo "Nixpkgs updated to $hash"
+    '')
     (writeShellScriptBin "docker-build-push" ''
       set -e
       cython-clean && cython-build
@@ -68,8 +87,6 @@ let
     echo "Activating Python virtual environment"
     source .venv/bin/activate
 
-    export LD_LIBRARY_PATH="${lib.makeLibraryPath libraries'}"
-
     # Development environment variables
     export SECRET="development-secret"
 
@@ -85,7 +102,6 @@ let
 in
 pkgs.mkShell
 {
-  libraries = libraries';
   buildInputs = libraries' ++ packages';
   shellHook = shell';
 }

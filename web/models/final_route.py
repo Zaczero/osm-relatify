@@ -11,12 +11,10 @@ class FinalRouteWay:
     reversed_latLngs: bool
 
 
-# tuples fail to decode from json, so we use lists
-class WarningSeverity(Enum):
-    LOW = ['LOW', 0]
-    HIGH = ['HIGH', 1]
-
-    UNCHANGED = ['UNCHANGED', 10]
+class WarningSeverity(int, Enum):
+    LOW = 0
+    HIGH = 1
+    UNCHANGED = 10
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
