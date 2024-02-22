@@ -447,7 +447,7 @@ class Overpass:
 
             elements: list[dict] = r.json()['elements']
 
-            relation_way_members = set(e['id'] for e in elements)
+            relation_way_members = {e['id'] for e in elements}
             union_grid_cells_set: set[Cell] = set()
 
             for way in elements:
@@ -472,7 +472,7 @@ class Overpass:
         if download_hist is None:
             download_hist = DownloadHistory(session=DownloadHistory.make_session(), history=(union_grid_cells,))
         elif union_grid_cells:
-            download_hist = replace(download_hist, history=download_hist.history + (union_grid_cells,))
+            download_hist = replace(download_hist, history=(*download_hist.history, union_grid_cells))
 
         elements_split, bbc = await self._query_relation_history(relation_id, download_hist)
 

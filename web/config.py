@@ -2,7 +2,6 @@ import os
 import secrets
 
 import sentry_sdk
-from sentry_sdk.integrations.asyncio import AsyncioIntegration
 
 SECRET = os.getenv('SECRET', None)
 
@@ -12,7 +11,7 @@ if not SECRET:
 
 WEBSITE = os.getenv('WEBSITE', 'https://github.com/Zaczero/osm-relatify')
 
-VERSION = '1.2.4'
+VERSION = '1.2.6'
 CREATED_BY = f'osm-relatify {VERSION}'
 USER_AGENT = f'osm-relatify/{VERSION} (+https://github.com/Zaczero/osm-relatify)'
 
@@ -64,7 +63,4 @@ if not TEST_ENV:
         traces_sample_rate=0.2,
         trace_propagation_targets=None,
         profiles_sample_rate=0.2,
-        integrations=[
-            AsyncioIntegration(),
-        ],
     )

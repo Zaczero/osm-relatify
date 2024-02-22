@@ -12,7 +12,7 @@ from fastapi.templating import Jinja2Templates
 from httpx import HTTPStatusError
 from msgspec.json import Decoder, Encoder
 from pydantic import BaseModel
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.websockets import WebSocketState
 
@@ -215,7 +215,7 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
         while True:
             body = await ws.receive_bytes()
 
-            with start_transaction(op='websocket', name='/ws/calc_bus_route'):
+            with start_span(op='websocket.function', name='calc_bus_route'):
                 body = deflate_decompress(body)
                 json: dict = _json_decode(body)
                 model = from_dict(
