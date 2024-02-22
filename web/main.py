@@ -215,7 +215,7 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
         while True:
             body = await ws.receive_bytes()
 
-            with start_span(op='websocket.function', name='calc_bus_route'):
+            with start_span(op='websocket.function', description='calc_bus_route'):
                 body = deflate_decompress(body)
                 json: dict = _json_decode(body)
                 model = from_dict(

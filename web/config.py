@@ -11,7 +11,7 @@ if not SECRET:
 
 WEBSITE = os.getenv('WEBSITE', 'https://github.com/Zaczero/osm-relatify')
 
-VERSION = '1.2.6'
+VERSION = '1.2.7'
 CREATED_BY = f'osm-relatify {VERSION}'
 USER_AGENT = f'osm-relatify/{VERSION} (+https://github.com/Zaczero/osm-relatify)'
 
