@@ -141,9 +141,9 @@ class PostQueryModel(BaseModel):
 @app.post('/query')
 async def post_query(model: PostQueryModel, _=Depends(require_user_details)):
     print(f'🔍 Querying relation ({model.relationId})')
-    assert (model.downloadHistory is None) == (model.downloadTargets is None)
 
     if model.downloadHistory is not None:
+        assert model.downloadTargets is not None
         download_hist = from_dict(DownloadHistory, model.downloadHistory, Config(cast=[tuple], strict=True))
         download_targets = tuple(from_dict(Cell, t, Config(cast=[], strict=True)) for t in model.downloadTargets)
 
