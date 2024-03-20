@@ -2,6 +2,11 @@
   text-decoration: unset;
 }
 
+.login-btn img {
+  position: relative;
+  top: -0.05em;
+}
+
 .container-full-screen {
   display: flex;
   flex-direction: column;

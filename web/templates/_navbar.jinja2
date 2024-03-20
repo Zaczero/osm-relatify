@@ -4,7 +4,7 @@
     <div class="container-fluid">
 
         <span class="navbar-brand">
-            <img src="/static/img/icon.webp" width="30" class="d-inline-block align-text-top">
+            <img src="/static/img/favicon/256.webp" width="30" class="d-inline-block align-text-top">
             <a class="link-dark link-underline-opacity-0" href="/">Relatify</a>
             <span class="navbar-brand-sub">
                 by
@@ -66,7 +66,7 @@
                     {{ user.display_name }}
                 </a>
 
-                <form class="d-inline" action="/logout" method="post">
+                <form class="d-inline" method="POST" action="/logout">
                     <input class="btn btn-sm btn-light" type="submit" value="⏻ Logout">
                 </form>
             </li>

@@ -85,7 +85,7 @@ class OsmButton extends L.Control {
         const div = createElementFromHTML(`
             <div class="leaflet-bar leaflet-control leaflet-control-custom" title="Open in OpenStreetMap">
                 <a href="javascript:;">
-                    <img src="/static/img/openstreetmap.svg" height="24" alt="Open in OpenStreetMap">
+                    <img src="/static/img/brands/openstreetmap.webp" height="24" alt="Open in OpenStreetMap">
                 </a>
             </div>`)
 

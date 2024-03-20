@@ -104,7 +104,7 @@ export function showContextMenu(e, way) {
                     <div>Set <b>END</b></div>
                 </button>
                 <button class="btn btn-sm btn-light d-flex flex-column align-items-center" id="ep-open-osm">
-                    <img class="mb-1" src="/static/img/openstreetmap.svg" width="24" alt="OpenStreetMap logo">
+                    <img class="mb-1" src="/static/img/brands/openstreetmap.webp" width="24" alt="OpenStreetMap logo">
                     <div>Inspect</div>
                 </button>
             </div>`,

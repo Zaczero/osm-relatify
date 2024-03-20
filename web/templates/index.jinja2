@@ -1,5 +1,11 @@
 {% extends '_base.jinja2' %}
 {% import '_licenses_modal.jinja2' as licenses_modal with context %}
+{% block head %}
+<meta name="description" content="OpenStreetMap public transport made easy. {#
+    #}OSM Relatify is a user-friendly web editor designed for mapping public transport relations. {#
+    #}Currently, only editing existing bus routes is supported.">
+<link rel="canonical" href="/">
+{% endblock %}
 {% block body %}
 <div class="container homepage text-center my-5">
 
@@ -24,16 +30,16 @@
     </span>
     <span>
       <a class="" href="https://github.com/Zaczero/osm-relatify" target="_blank">
-        <img class="repo-stars" alt="GitHub Repo stars"
+        <img class="repo-stars" alt="GitHub repo stars"
           src="https://shields.monicz.dev/github/stars/Zaczero/osm-relatify?style=social">
       </a>
     </span>
 
   </div>
 
-  <form action="/login" method="post">
-    <button class="btn btn-primary" type="submit">
-      <img src="/static/img/openstreetmap.svg" height="22" alt="OpenStreetMap logo">
+  <form method="POST" action="/login">
+    <button class="btn btn-primary login-btn" type="submit">
+      <img src="/static/img/brands/openstreetmap.webp" height="22" alt="OpenStreetMap logo">
       Login with <b>OpenStreetMap</b>
     </button>
   </form>
