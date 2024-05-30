@@ -151,7 +151,7 @@ class BestPathCollection(NamedTuple):
 
 
 def get_way_endpoints(
-    latlons: Sequence[tuple[cython.double, cython.double]]
+    latlons: Sequence[tuple[cython.double, cython.double]],
 ) -> tuple[tuple[cython.double, cython.double], tuple[cython.double, cython.double]]:
     return latlons[0], latlons[-1]
 
@@ -167,7 +167,7 @@ def build_graph(ways: dict[ElementId, FetchRelationElement]) -> dict[GraphKey, G
             neighbors = []
 
             for connected_way_id in way.connectedTo:  # noqa: B023
-                connected_way = ways.get(connected_way_id, None)
+                connected_way = ways.get(connected_way_id)
 
                 # skip non-member ways
                 if not connected_way:

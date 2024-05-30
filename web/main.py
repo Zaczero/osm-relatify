@@ -259,7 +259,7 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
                             )
                         )
 
-                except asyncio.TimeoutError as e:
+                except TimeoutError as e:
                     raise HTTPException(status.HTTP_408_REQUEST_TIMEOUT, 'Route calculation timed out') from e
 
                 relation = get_task.result()

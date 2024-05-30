@@ -277,7 +277,7 @@ def _update_relations_after_split(
         element_ids = native_id_element_ids_map[way_id]
 
         # assert unique relations
-        assert len(parents.id_relations_map[way_id]) == len(set(r['@id'] for r in parents.id_relations_map[way_id]))
+        assert len(parents.id_relations_map[way_id]) == len({r['@id'] for r in parents.id_relations_map[way_id]})
 
         # iterate over each related relation
         for relation in parents.id_relations_map[way_id]:
@@ -417,29 +417,27 @@ async def build_osm_change(
     next_unique_id: int = -1
 
     # iterate over route members and check if they are split
-    for obj in chain(route.members, (way for way in route.extraWaysToUpdate)):
+    for obj in chain(route.members, route.extraWaysToUpdate):
         element_id = obj.id
         element_id_parts = split_element_id(element_id)
+        if element_id_parts.extra_num is None:
+            continue
 
-        if element_id_parts.extra_num is not None:
-            split_ways.add(element_id_parts.id)
-            native_id_element_ids_map[element_id_parts.id][element_id_parts.extra_num] = element_id
+        split_ways.add(element_id_parts.id)
+        native_id_element_ids_map[element_id_parts.id][element_id_parts.extra_num] = element_id
 
-            if element_id not in element_id_unique_map:
-                if element_id_parts.extra_num == 1:
-                    element_id_unique_map[element_id] = element_id_parts.id
-                else:
-                    element_id_unique_map[element_id] = next_unique_id
-                    unique_native_id_map[next_unique_id] = element_id_parts.id
-                    next_unique_id -= 1
-
-            else:
-                print(f'🚧 Warning: Repeated element_id: {element_id}')
+        if element_id in element_id_unique_map:
+            continue
+        if element_id_parts.extra_num == 1:
+            element_id_unique_map[element_id] = element_id_parts.id
+        else:
+            element_id_unique_map[element_id] = next_unique_id
+            unique_native_id_map[next_unique_id] = element_id_parts.id
+            next_unique_id -= 1
 
     for group in native_id_element_ids_map.values():
-        assert (
-            len(group) == split_element_id(group[1]).max_num
-        ), f'Split ways are not complete: {", ".join(f"{k}={v}" for k, v in group.items())}'
+        if (1 not in group) or len(group) != split_element_id(group[1]).max_num:
+            raise AssertionError(f'Split ways are not complete: {", ".join(f"{k}={v}" for k, v in group.items())}')
 
     split_ways = frozenset(split_ways)
 

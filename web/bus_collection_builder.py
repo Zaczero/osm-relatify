@@ -18,10 +18,10 @@ from utils import extract_numbers
 
 
 def _pick_best(
-    elements: list[FetchRelationBusStop]
+    elements: list[FetchRelationBusStop],
 ) -> tuple[Sequence[FetchRelationBusStop], Sequence[FetchRelationBusStop]]:
     if not elements:
-        return tuple(), tuple()
+        return (), ()
 
     elements_explicit = tuple(e for e in elements if e.highway == 'bus_stop')
     elements_implicit = tuple(e for e in elements if e.highway != 'bus_stop')
@@ -115,7 +115,7 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
             name_groups[bus_stop.groupName].append(bus_stop)
 
         # discard unnamed if in area with named
-        if len(name_groups) > 1 and (unnamed := name_groups.get('', None)):
+        if len(name_groups) > 1 and (unnamed := name_groups.get('')):
             unnamed = [s for s in unnamed if s.public_transport == PublicTransport.PLATFORM]  # never discard platforms
             if unnamed:
                 name_groups[''] = unnamed

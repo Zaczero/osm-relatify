@@ -1,35 +1,43 @@
 { isDevelopment ? true }:
 
 let
-  # Currently using nixpkgs-unstable
-  # Update with `nixpkgs-update` command
-  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/7872526e9c5332274ea5932a0c3270d6e4724f3b.tar.gz") { };
+  # Update packages with `nixpkgs-update` command
+  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/6c25325ec30a566f5c0446ceee61ada081903872.tar.gz") { };
 
-  libraries' = with pkgs; [
-    # Base libraries
+  pythonLibs = with pkgs; [
     stdenv.cc.cc.lib
     zlib.out
   ];
 
-  # Wrap Python to override LD_LIBRARY_PATH
+  # Override LD_LIBRARY_PATH to load Python libraries
   wrappedPython = with pkgs; (symlinkJoin {
     name = "python";
     paths = [
-      # Enable Python optimizations when in production
+      # Enable compiler optimizations when in production
       (if isDevelopment then python312 else python312.override { enableOptimizations = true; })
     ];
     buildInputs = [ makeWrapper ];
     postBuild = ''
-      wrapProgram "$out/bin/python3.12" --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath libraries'}"
+      wrapProgram "$out/bin/python3.12" --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath pythonLibs}"
     '';
   });
 
   packages' = with pkgs; [
-    # Base packages
     wrappedPython
+    poetry
+    ruff
+    biome
+    gcc
     esbuild
 
     # Scripts
+    # -- Cython
+    (writeShellScriptBin "cython-build" ''
+      python setup.py build_ext --build-lib cython_lib
+    '')
+    (writeShellScriptBin "cython-clean" ''
+      rm -rf build/ cython_lib/*{.c,.html,.so}
+    '')
     # -- Misc
     (writeShellScriptBin "make-version" ''
       sed -i -r "s|VERSION = '([0-9.]+)'|VERSION = '\1.$(date +%y%m%d)'|g" config.py
@@ -47,23 +55,6 @@ let
       esbuild static/css/style.css --bundle --minify --sourcemap --charset=utf8 --outfile=static/css/style.$HASH.css && \
       find templates -type f -exec sed -i 's|href="/static/css/style.css"|href="/static/css/style.'$HASH'.css"|g' {} \;
     '')
-  ] ++ lib.optionals isDevelopment [
-    # Development packages
-    poetry
-    ruff
-    biome
-    gcc
-
-    # Scripts
-    # -- Cython
-    (writeShellScriptBin "cython-build" ''
-      python setup.py build_ext --build-lib cython_lib
-    '')
-    (writeShellScriptBin "cython-clean" ''
-      rm -rf build/ cython_lib/*{.c,.html,.so}
-    '')
-
-    # -- Misc
     (writeShellScriptBin "nixpkgs-update" ''
       set -e
       hash=$(git ls-remote https://github.com/NixOS/nixpkgs nixpkgs-unstable | cut -f 1)
@@ -93,22 +84,22 @@ let
 
     # Development environment variables
     export PYTHONNOUSERSITE=1
+    export TZ=UTC
     export TEST_ENV=1
-    export SECRET="development-secret"
+    export SECRET=development-secret
 
     if [ -f .env ]; then
       echo "Loading .env file"
       set -o allexport
       source .env set
-      +o allexport
+      set +o allexport
     fi
   '' + lib.optionalString (!isDevelopment) ''
     make-version
     make-bundle
   '';
 in
-pkgs.mkShell
-{
+pkgs.mkShell {
   buildInputs = packages';
   shellHook = shell';
 }
