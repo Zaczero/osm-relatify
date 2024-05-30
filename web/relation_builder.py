@@ -128,7 +128,7 @@ def _unsplit_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
     # pass 1, create blacklist
     i = 0
     while i < len(way_ids_parts):
-        way_id_parts = way_ids[i]
+        way_id_parts = way_ids_parts[i]
 
         # skip: not splitted way
         if way_id_parts.extra_num is None:
