@@ -120,59 +120,65 @@ def sort_bus_on_path(
     return sorted(result, key=lambda x: x.sort_index)  # TODO: sort stop, platform on the same sort_index
 
 
-def _simplify_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
-    way_ids_parts = tuple(split_element_id(way_id) for way_id in way_ids)
-    simplify_blacklist: set[int] = set()
+def _unsplit_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
+    way_ids_parts = tuple(map(split_element_id, way_ids))
+    simplify_whitelist: set[int] = set()
+    simplify_blacklist: list[int] = []
 
-    # pass 1, fill blacklist
+    # pass 1, create blacklist
     i = 0
     while i < len(way_ids_parts):
-        way_id, way_id_parts = way_ids[i], way_ids_parts[i]
+        way_id_parts = way_ids[i]
 
-        if way_id_parts.extra_num == 1 or (
-            way_id_parts.extra_num is not None and way_id_parts.extra_num == way_id_parts.max_num
+        # skip: not splitted way
+        if way_id_parts.extra_num is None:
+            i += 1
+            continue
+
+        # skip and blacklist: mid-splitted way
+        if 1 < way_id_parts.extra_num < way_id_parts.max_num:
+            simplify_blacklist.append(way_id_parts.id)
+            i += 1
+            continue
+
+        i_end = i + way_id_parts.max_num - 1
+
+        # skip and blacklist: out-of-bounds way
+        if i_end >= len(way_ids):
+            simplify_blacklist.append(way_id_parts.id)
+            i += 1
+            continue
+
+        # skip and blacklist: non-linear way
+        if not all(
+            other_way_id_parts.id == way_id_parts.id  #
+            for other_way_id_parts in way_ids_parts[i + 1 : i_end + 1]
         ):
-            last_i = i + way_id_parts.max_num - 1
+            simplify_blacklist.append(way_id_parts.id)
+            i += 1
+            continue
 
-            if last_i < len(way_ids):
-                if all(
-                    other_way_id_parts.id == way_id_parts.id for other_way_id_parts in way_ids_parts[i + 1 : last_i + 1]
-                ):
-                    # simplify
-                    i += way_id_parts.max_num
-                    continue
-                else:
-                    simplify_blacklist.add(way_id_parts.id)
-            else:
-                simplify_blacklist.add(way_id_parts.id)
+        # ok to simplify
+        simplify_whitelist.add(way_id_parts.id)
+        i += way_id_parts.max_num
 
-        i += 1
-
+    simplify_whitelist.difference_update(simplify_blacklist)
     result = []
 
     # pass 2, generate results
     i = 0
     while i < len(way_ids_parts):
-        way_id, way_id_parts = way_ids[i], way_ids_parts[i]
+        way_id_parts = way_ids_parts[i]
 
-        if way_id_parts.id not in simplify_blacklist:
-            if way_id_parts.extra_num == 1 or (
-                way_id_parts.extra_num is not None and way_id_parts.extra_num == way_id_parts.max_num
-            ):
-                last_i = i + way_id_parts.max_num - 1
+        if way_id_parts.id not in simplify_whitelist:
+            way_id = way_ids[i]
+            result.append(way_id)
+            i += 1
+            continue
 
-                if last_i < len(way_ids):
-                    if all(
-                        other_way_id_parts.id == way_id_parts.id
-                        for other_way_id_parts in way_ids_parts[i + 1 : last_i + 1]
-                    ):
-                        # simplify
-                        result.append(element_id(way_id_parts.id))
-                        i += way_id_parts.max_num
-                        continue
-
-        result.append(way_id)
-        i += 1
+        # simplify
+        result.append(element_id(way_id_parts.id))
+        i += way_id_parts.max_num
 
     return result
 
@@ -226,7 +232,7 @@ def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationM
             members.insert(0, stop_member)
 
     way_ids = [route_way.way.id for route_way in route.ways]
-    way_ids = _simplify_way_ids(way_ids)
+    way_ids = _unsplit_way_ids(way_ids)
 
     for way_id in way_ids:
         role = ''
