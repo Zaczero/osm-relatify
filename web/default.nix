@@ -1,4 +1,4 @@
-{ pkgs ? import <nixpkgs> { }, ... }:
+{ pkgs ? import <nixpkgs> { } }:
 
 let
   shell = import ./shell.nix { isDevelopment = false; };

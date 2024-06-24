@@ -2,15 +2,13 @@
 
 let
   # Update packages with `nixpkgs-update` command
-  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/6c25325ec30a566f5c0446ceee61ada081903872.tar.gz") { };
+  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/9693852a2070b398ee123a329e68f0dab5526681.tar.gz") { };
 
   pythonLibs = with pkgs; [
     stdenv.cc.cc.lib
     zlib.out
   ];
-
-  # Override LD_LIBRARY_PATH to load Python libraries
-  wrappedPython = with pkgs; (symlinkJoin {
+  python' = with pkgs; (symlinkJoin {
     name = "python";
     paths = [
       # Enable compiler optimizations when in production
@@ -23,25 +21,20 @@ let
   });
 
   packages' = with pkgs; [
-    wrappedPython
+    python'
     poetry
     ruff
     biome
-    gcc
+    gcc14
     esbuild
 
     # Scripts
     # -- Cython
-    (writeShellScriptBin "cython-build" ''
-      python setup.py build_ext --build-lib cython_lib
-    '')
-    (writeShellScriptBin "cython-clean" ''
-      rm -rf build/ cython_lib/*{.c,.html,.so}
-    '')
+    (writeShellScriptBin "cython-build" "python setup.py build_ext --build-lib cython_lib")
+    (writeShellScriptBin "cython-clean" "rm -rf build/ cython_lib/*{.c,.html,.so}")
     # -- Misc
-    (writeShellScriptBin "make-version" ''
-      sed -i -r "s|VERSION = '([0-9.]+)'|VERSION = '\1.$(date +%y%m%d)'|g" config.py
-    '')
+    (writeShellScriptBin "run" "python -m uvicorn main:app --reload")
+    (writeShellScriptBin "make-version" "sed -i -r \"s|VERSION = '([0-9.]+)'|VERSION = '\1.$(date +%y%m%d)'|g\" config.py")
     (writeShellScriptBin "make-bundle" ''
       chmod +w static/js static/css templates
 
@@ -72,11 +65,11 @@ let
   shell' = with pkgs; lib.optionalString isDevelopment ''
     current_python=$(readlink -e .venv/bin/python || echo "")
     current_python=''${current_python%/bin/*}
-    [ "$current_python" != "${wrappedPython}" ] && rm -r .venv
+    [ "$current_python" != "${python'}" ] && rm -rf .venv/
 
     echo "Installing Python dependencies"
     export POETRY_VIRTUALENVS_IN_PROJECT=1
-    poetry env use "${wrappedPython}/bin/python"
+    poetry env use "${python'}/bin/python"
     poetry install --no-root --compile
 
     echo "Activating Python virtual environment"
@@ -99,7 +92,7 @@ let
     make-bundle
   '';
 in
-pkgs.mkShell {
+pkgs.mkShellNoCC {
   buildInputs = packages';
   shellHook = shell';
 }

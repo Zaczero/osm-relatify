@@ -123,13 +123,15 @@ function updateWaysVisibility() {
 const addWay = (way) => {
     if (idGroupMap.has(way.id)) return
 
-    const lineColor = way.member ? "orangered" : "#909090"
-    const lineHoverColor = way.member ? "darkred" : "#4C4C4C"
+    const lineColor = way.member ? "orangered" : "#444"
+    const lineHoverColor = way.member ? "darkred" : "#000"
     const lineWeight = way.member ? 7 : 5
+    const opacity = way.member ? 1 : 0.55
 
     const line = L.polyline(way.latLngs, {
         renderer: canvasRenderer,
         color: lineColor,
+        opacity: opacity,
         weight: lineWeight,
         pane: way.member ? "memberWays" : "nonMemberWays",
     })
@@ -156,6 +158,7 @@ const addWay = (way) => {
             stroke: false,
             fill: true,
             fillColor: lineHoverColor,
+            fillOpacity: opacity,
         })
     }
 
