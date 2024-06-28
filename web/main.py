@@ -125,7 +125,7 @@ def get_route_type(tags: dict[str, str]) -> str | None:
 
     type_specifier = tags.get(type)
 
-    if type_specifier not in ('bus',):
+    if type_specifier not in ('bus','tram'):
         return None
 
     return type_specifier
@@ -158,29 +158,29 @@ async def post_query(model: PostQueryModel, _=Depends(require_user_details)):
         download_targets = None
 
     with print_run_time('Querying relation data'):
-        query_task = asyncio.create_task(overpass.query_relation(model.relationId, download_hist, download_targets))
         get_task = asyncio.create_task(openstreetmap.get_relation(model.relationId))
 
         try:
             relation = await get_task
         except HTTPStatusError as e:
-            query_task.cancel()
             if e.response.status_code == status.HTTP_404_NOT_FOUND:
                 raise HTTPException(status.HTTP_404_NOT_FOUND, 'Relation not found') from e
             raise
 
         relation_tags = relation.get('tags', {})
 
-        if get_route_type(relation_tags) is None:
-            query_task.cancel()
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Relation must be a PTv2 bus route')
+        route_type = get_route_type(relation_tags)
+        if route_type is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Relation must be a PTv2 bus/tram route')
+        
+        query_task = asyncio.create_task(overpass.query_relation(model.relationId, download_hist, download_targets, route_type))
 
         bounds, download_hist, download_triggers, ways, id_map, bus_stop_collections = await query_task
 
     with print_run_time('Finding start/stop ways'):
         start_way, stop_way = find_start_stop_ways(ways, id_map, relation)
 
-    with print_run_time('Assigning members for bus stops'):
+    with print_run_time('Assigning members for stops'):
         bus_stop_collections = assign_none_members(bus_stop_collections, relation)
 
     return FetchRelation(

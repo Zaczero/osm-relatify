@@ -106,7 +106,7 @@ class FetchRelationBusStop:
             tags=data['tags'],
             name=name,
             groupName=group_name,
-            highway=data['tags'].get('highway', None),
+            highway=data['tags'].get('railway', None),
             public_transport=PublicTransport(data['tags']['public_transport']),
         )
 
