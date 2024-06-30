@@ -34,7 +34,7 @@ let
     (writeShellScriptBin "cython-clean" "rm -rf build/ cython_lib/*{.c,.html,.so}")
     # -- Misc
     (writeShellScriptBin "run" "python -m uvicorn main:app --reload")
-    (writeShellScriptBin "make-version" "sed -i -r \"s|VERSION = '([0-9.]+)'|VERSION = '\1.$(date +%y%m%d)'|g\" config.py")
+    (writeShellScriptBin "make-version" "sed -i -E \"s|VERSION = '([0-9.]+)'|VERSION = '\\1.$(date +%y%m%d)'|\" config.py")
     (writeShellScriptBin "make-bundle" ''
       chmod +w static/js static/css templates
 
