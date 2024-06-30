@@ -237,7 +237,7 @@ def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationM
     for way_id in way_ids:
         role = ''
 
-        if (member := id_relation_member_map.get(way_id, None)) is not None:
+        if (member := id_relation_member_map.get(way_id)) is not None:
             if member.role not in {'route', 'forward', 'backward'}:
                 role = member.role
 

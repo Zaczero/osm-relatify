@@ -46,39 +46,79 @@ def build_bb_query(relation_id: int, timeout: int) -> str:
     return f'[out:json][timeout:{timeout}];rel({relation_id});way(r);out ids bb qt;'
 
 
-def build_bus_query(cell_bbs: Sequence[BoundingBox], cell_bbs_expanded: Sequence[BoundingBox], timeout: int) -> str:
-    return (
-        f'[out:json][timeout:{timeout}];'
-        f'(' + ''.join(f'way[highway][!footway]({bb});' for bb in cell_bbs) + ');'
-        'out body qt;'
-        'out count;'
-        '>;'
-        'out skel qt;'
-        'out count;'
-        + ''.join(
-            f'node[highway=bus_stop][public_transport=platform]({bb});'
-            f'out tags center qt;'
-            f'nwr[highway=platform][public_transport=platform]({bb});'
-            f'out tags center qt;'
-            f'node[public_transport=stop_position]({bb});'
-            f'out tags center qt;'
-            for bb in cell_bbs_expanded
+def build_query(
+    cell_bbs: Sequence[BoundingBox],
+    cell_bbs_expanded: Sequence[BoundingBox],
+    timeout: int,
+    route_type: str,
+) -> str:
+    if route_type == 'bus':
+        return (
+            f'[out:json][timeout:{timeout}];'
+            f'(' + ''.join(f'way[highway][!footway]({bb});' for bb in cell_bbs) + ');'
+            'out body qt;'
+            'out count;'
+            '>;'
+            'out skel qt;'
+            'out count;'
+            + ''.join(
+                f'node[highway=bus_stop][public_transport=platform][name]({bb});'
+                f'out tags center qt;'
+                f'nwr[highway=platform][public_transport=platform][name]({bb});'
+                f'out tags center qt;'
+                f'node[public_transport=stop_position][name]({bb});'
+                f'out tags center qt;'
+                for bb in cell_bbs_expanded
+            )
+            + 'out count;'
+            '(' + ''.join(f'rel[public_transport=stop_area]({bb});' for bb in cell_bbs_expanded) + ')->.r;'
+            '.r out body qt;'
+            '.r out count;'
+            'node(r.r:platform);'
+            'out tags center qt;'
+            'way(r.r:platform);'
+            'out tags center qt;'
+            'rel(r.r:platform);'
+            'out tags center qt;'
+            'out count;'
+            'node(r.r:stop);'
+            'out tags center qt;'
+            'out count;'
         )
-        + 'out count;'
-        '(' + ''.join(f'rel[public_transport=stop_area]({bb});' for bb in cell_bbs_expanded) + ')->.r;'
-        '.r out body qt;'
-        '.r out count;'
-        'node(r.r:platform);'
-        'out tags center qt;'
-        'way(r.r:platform);'
-        'out tags center qt;'
-        'rel(r.r:platform);'
-        'out tags center qt;'
-        'out count;'
-        'node(r.r:stop);'
-        'out tags center qt;'
-        'out count;'
-    )
+
+    if route_type == 'tram':
+        return (
+            f'[out:json][timeout:{timeout}];'
+            f'(' + ''.join(f'way[railway=tram]({bb});' for bb in cell_bbs) + ');'
+            'out body qt;'
+            'out count;'
+            '>;'
+            'out skel qt;'
+            'out count;'
+            + ''.join(
+                f'node[railway=tram_stop][public_transport=stop_position][name]({bb});'
+                f'out tags center qt;'
+                f'nwr[railway=platform][public_transport=platform][name]({bb});'
+                f'out tags center qt;'
+                f'nwr[tram][public_transport=platform][name]({bb});'
+                f'out tags center qt;'
+                for bb in cell_bbs_expanded
+            )
+            + 'out count;'
+            '(' + ''.join(f'rel[public_transport=stop_area]({bb});' for bb in cell_bbs_expanded) + ')->.r;'
+            '.r out body qt;'
+            '.r out count;'
+            'node(r.r:platform);'
+            'out tags center qt;'
+            'way(r.r:platform);'
+            'out tags center qt;'
+            'rel(r.r:platform);'
+            'out tags center qt;'
+            'out count;'
+            'node(r.r:stop);'
+            'out tags center qt;'
+            'out count;'
+        )
 
 
 def build_parents_query(way_ids: Iterable[int], timeout: int) -> str:
@@ -93,63 +133,68 @@ def build_parents_query(way_ids: Iterable[int], timeout: int) -> str:
     )
 
 
-def is_road(tags: dict[str, str]) -> bool:
-    highway_valid = tags['highway'] in {
-        'residential',
-        'service',
-        'unclassified',
-        'tertiary',
-        'tertiary_link',
-        'secondary',
-        'secondary_link',
-        'primary',
-        'primary_link',
-        'living_street',
-        'trunk',
-        'trunk_link',
-        'motorway',
-        'motorway_link',
-        'motorway_junction',
-        'road',
-        'busway',
-        'bus_guideway',
-    }
+def is_routable(tags: dict[str, str], route_type: str) -> bool:
+    if route_type == 'bus':
+        highway_valid = tags['highway'] in {
+            'residential',
+            'service',
+            'unclassified',
+            'tertiary',
+            'tertiary_link',
+            'secondary',
+            'secondary_link',
+            'primary',
+            'primary_link',
+            'living_street',
+            'trunk',
+            'trunk_link',
+            'motorway',
+            'motorway_link',
+            'motorway_junction',
+            'road',
+            'busway',
+            'bus_guideway',
+        }
 
-    highway_designated_valid = tags['highway'] in {
-        'pedestrian',
-    }
+        highway_designated_valid = tags['highway'] in {
+            'pedestrian',
+        }
 
-    service_valid = tags.get('service', 'no') not in {
-        'driveway',
-        'parking_aisle',
-        'alley',
-        'emergency_access',
-    }
+        service_valid = tags.get('service', 'no') not in {
+            'driveway',
+            'parking_aisle',
+            'alley',
+            'emergency_access',
+        }
 
-    access_designated = False
-    access_valid = True
+        access_designated = False
+        access_valid = True
 
-    if 'bus:conditional' in tags:
-        access_designated = access_valid = True
-    elif 'bus' in tags:
-        access_designated = access_valid = tags['bus'] not in {'no'}
-    elif 'psv' in tags:
-        access_designated = access_valid = tags['psv'] not in {'no'}
-    elif 'motor_vehicle' in tags:
-        access_valid = tags['motor_vehicle'] not in {'private', 'customers', 'no'}
-    elif 'access' in tags:
-        access_valid = tags['access'] not in {'private', 'customers', 'no'}
+        if 'bus:conditional' in tags:
+            access_designated = access_valid = True
+        elif 'bus' in tags:
+            access_designated = access_valid = tags['bus'] not in {'no'}
+        elif 'psv' in tags:
+            access_designated = access_valid = tags['psv'] not in {'no'}
+        elif 'motor_vehicle' in tags:
+            access_valid = tags['motor_vehicle'] not in {'private', 'customers', 'no'}
+        elif 'access' in tags:
+            access_valid = tags['access'] not in {'private', 'customers', 'no'}
 
-    noarea_valid = tags.get('area', 'no') in {'no'}
+        noarea_valid = tags.get('area', 'no') in {'no'}
 
-    return all(
-        (
-            (highway_valid or (highway_designated_valid and access_designated)),
-            (service_valid or access_designated),
-            access_valid,
-            noarea_valid,
+        return all(
+            (
+                (highway_valid or (highway_designated_valid and access_designated)),
+                (service_valid or access_designated),
+                access_valid,
+                noarea_valid,
+            )
         )
-    )
+
+    if route_type == 'tram':
+        # all overpass-fetched elements are routable
+        return True
 
 
 def is_oneway(tags: dict[str, str]) -> bool:
@@ -176,10 +221,8 @@ def is_roundabout(tags: dict[str, str]) -> bool:
     return tags.get('junction', 'no') in {'roundabout'}
 
 
-def is_bus_related(tags: dict[str, str]) -> bool:
-    bus_valid = tags.get('bus', 'no') in {'yes'}
-
-    return bus_valid
+def is_bus_explicit(tags: dict[str, str]) -> bool:
+    return tags.get('bus') == 'yes'
 
 
 def is_rail_related(tags: dict[str, str]) -> bool:
@@ -391,6 +434,7 @@ class Overpass:
         self,
         relation_id: int,
         download_hist: DownloadHistory,
+        route_type: str,
     ) -> tuple[list[list[dict]], BoundingBoxCollection]:
         if not download_hist.history or not all(download_hist.history):
             raise ValueError('No grid cells to download')
@@ -410,7 +454,7 @@ class Overpass:
             print(f'[OVERPASS] Downloading {len(cell_bbs)} cells for relation {relation_id}')
 
             timeout = 180
-            query = build_bus_query(cell_bbs, cell_bbs_expand, timeout)
+            query = build_query(cell_bbs, cell_bbs_expand, timeout, route_type)
             elements_split = await self._query_relation_history_post(download_hist.session, query, timeout)
 
             if all_elements_split is None:
@@ -429,6 +473,7 @@ class Overpass:
         relation_id: int,
         download_hist: DownloadHistory | None,
         download_targets: Sequence[Cell] | None,
+        route_type: str,  # bus, tram...
     ) -> tuple[
         BoundingBox,
         DownloadHistory,
@@ -474,7 +519,7 @@ class Overpass:
         elif union_grid_cells:
             download_hist = replace(download_hist, history=(*download_hist.history, union_grid_cells))
 
-        elements_split, bbc = await self._query_relation_history(relation_id, download_hist)
+        elements_split, bbc = await self._query_relation_history(relation_id, download_hist, route_type)
 
         maybe_road_elements = elements_split[0]
         maybe_road_elements = preprocess_elements(maybe_road_elements)
@@ -500,7 +545,7 @@ class Overpass:
             public_transport='stop_position',
         )
 
-        road_elements = tuple(e for e in maybe_road_elements if is_road(e['tags']))
+        road_elements = tuple(e for e in maybe_road_elements if is_routable(e['tags'], route_type))
 
         nodes_map = {e['id']: e for e in node_elements}
 
@@ -524,12 +569,15 @@ class Overpass:
             for e in road_elements
         }
 
-        bus_elements_ex = chain(stop_area_platform_elements, stop_area_stop_position_elements, bus_elements)
-        bus_elements_ex = preprocess_elements(bus_elements_ex)
-        bus_elements_ex = (e for e in bus_elements_ex if is_bus_related(e['tags']) or not is_rail_related(e['tags']))
+        elements_ex = chain(stop_area_platform_elements, stop_area_stop_position_elements, bus_elements)
+        elements_ex = preprocess_elements(elements_ex)
+        if route_type == 'bus':
+            elements_ex = (e for e in elements_ex if is_bus_explicit(e['tags']) or not is_rail_related(e['tags']))
+        elif route_type == 'tram':
+            elements_ex = (e for e in elements_ex if is_rail_related(e['tags']))
 
-        bus_stops = tuple(FetchRelationBusStop.from_data(e) for e in bus_elements_ex)
-        bus_stop_collections = build_bus_stop_collections(bus_stops)
+        stops = tuple(FetchRelationBusStop.from_data(e) for e in elements_ex)
+        bus_stop_collections = build_bus_stop_collections(stops)
         bus_stop_collections = tuple(c for c in bus_stop_collections if bbc.contains(c.best.latLng))
 
         global_bb = BoundingBox(*bbc.idx.bounds)
@@ -557,7 +605,7 @@ class Overpass:
 
         for relation in relations:
             members = relation['member'] = relation.get('member', [])
-            tags = relation['tag'] = relation.get('tag', [])
+            # tags = relation['tag'] = relation.get('tag', [])
 
             if len(members) <= 1:
                 continue
