@@ -3,15 +3,10 @@ import secrets
 
 import sentry_sdk
 
-SECRET = os.getenv('SECRET', None)
-
-if not SECRET:
-    print('🚧 Warning: Environment variable SECRET is not set. Using a random value.')
-    SECRET = secrets.token_bytes(32)
-
+SECRET = os.environ['SECRET']
 WEBSITE = os.getenv('WEBSITE', 'https://github.com/Zaczero/osm-relatify')
 
-VERSION = '1.3.1'
+VERSION = '1.4.0'
 CREATED_BY = f'osm-relatify {VERSION}'
 USER_AGENT = f'osm-relatify/{VERSION} (+https://github.com/Zaczero/osm-relatify)'
 

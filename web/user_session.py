@@ -50,7 +50,7 @@ async def fetch_user_details(request: Request = None, websocket: WebSocket = Non
 
 async def require_user_details(user=Depends(fetch_user_details)) -> dict:
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Unauthorized')
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Unauthorized')
     return user
 
 
@@ -58,7 +58,7 @@ def require_user_token(request: Request) -> dict:
     try:
         return request.session['token']
     except KeyError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Unauthorized') from e
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Unauthorized') from e
 
 
 def set_user_token(request: Request, token: dict) -> bool:

@@ -6,7 +6,9 @@ from itertools import chain, cycle, islice, zip_longest
 from typing import NamedTuple
 
 import xmltodict
+from fastapi import HTTPException
 from sklearn.neighbors import BallTree
+from starlette import status
 
 from config import CHANGESET_ID_PLACEHOLDER, CREATED_BY
 from cython_lib.geoutils import haversine_distance, radians_tuple
@@ -456,35 +458,46 @@ async def build_osm_change(
     if ways_task:
         ways = await ways_task
 
-        id_way_map = {route_way.way.id: route_way.way for route_way in route.ways} | {
-            way.id: way for way in route.extraWaysToUpdate
-        }
+        id_way_map = dict(
+            chain(
+                ((route_way.way.id, route_way.way) for route_way in route.ways),
+                ((way.id, way) for way in route.extraWaysToUpdate),
+            )
+        )
 
         # process fetched ways (split ways)
         for way_data in ways:
             way_id = int(way_data['@id'])
-
-            # strip unnecessary data
             way_data.pop('@timestamp', None)
             way_data.pop('@user', None)
             way_data.pop('@uid', None)
+            _set_changeset_placeholder(way_data, include_changeset_id)
 
             # perform splits
             for extra_num, element_id in native_id_element_ids_map[way_id].items():
                 element_way = id_way_map[element_id]
 
                 new_data = way_data.copy()
+                new_data['nd'] = [{'@ref': node_id} for node_id in element_way.nodes]
 
                 if extra_num == 1:
                     action = 'modify'
+
+                    # split conflict check
+                    way_data_nd = way_data.get('nd')
+                    if (
+                        way_data_nd
+                        and way_data_nd[0]['@ref'] == new_data['nd'][0]['@ref']
+                        and way_data_nd[-1]['@ref'] == new_data['nd'][-1]['@ref']
+                    ):
+                        raise HTTPException(
+                            status.HTTP_409_CONFLICT,
+                            f'Conflict: Way {way_id} was modified. Go back and click the relation reload button.',
+                        )
                 else:
                     action = 'create'
                     new_data['@id'] = element_id_unique_map[element_id]
                     new_data.pop('@version', None)
-
-                _set_changeset_placeholder(new_data, include_changeset_id)
-
-                new_data['nd'] = [{'@ref': node_id} for node_id in element_way.nodes]
 
                 result['osmChange'][action]['way'].append(new_data)
 
