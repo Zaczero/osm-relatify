@@ -100,6 +100,8 @@ def build_query(
                 f'out tags center qt;'
                 f'nwr[railway=platform][public_transport=platform][name]({bb});'
                 f'out tags center qt;'
+                f'nwr[railway=platform][public_transport=platform][ref]({bb});'
+                f'out tags center qt;'
                 f'nwr[tram][public_transport=platform][name]({bb});'
                 f'out tags center qt;'
                 for bb in cell_bbs_expanded
