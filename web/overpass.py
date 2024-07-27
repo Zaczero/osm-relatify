@@ -66,6 +66,8 @@ def build_query(
                 f'out tags center qt;'
                 f'nwr[highway=platform][public_transport=platform][name]({bb});'
                 f'out tags center qt;'
+                f'nwr[highway=platform][public_transport=platform][ref]({bb});'
+                f'out tags center qt;'
                 f'node[public_transport=stop_position][name]({bb});'
                 f'out tags center qt;'
                 for bb in cell_bbs_expanded
