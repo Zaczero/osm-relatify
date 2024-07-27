@@ -66,6 +66,8 @@ def build_query(
                 f'out tags center qt;'
                 f'nwr[highway=platform][public_transport=platform][name]({bb});'
                 f'out tags center qt;'
+                f'nwr[highway=platform][public_transport=platform][ref]({bb});'
+                f'out tags center qt;'
                 f'node[public_transport=stop_position][name]({bb});'
                 f'out tags center qt;'
                 for bb in cell_bbs_expanded
@@ -99,6 +101,8 @@ def build_query(
                 f'node[railway=tram_stop][public_transport=stop_position][name]({bb});'
                 f'out tags center qt;'
                 f'nwr[railway=platform][public_transport=platform][name]({bb});'
+                f'out tags center qt;'
+                f'nwr[railway=platform][public_transport=platform][ref]({bb});'
                 f'out tags center qt;'
                 f'nwr[tram][public_transport=platform][name]({bb});'
                 f'out tags center qt;'

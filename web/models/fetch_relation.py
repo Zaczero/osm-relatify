@@ -94,10 +94,12 @@ class FetchRelationBusStop:
         if name and local_ref and name.endswith(local_ref):
             local_ref = ''
 
+        # fallback to ref if no name/local_ref is available
+        if not name and not local_ref:
+            name = data['tags'].get('ref', '').strip()
+
         name = normalize_name(f'{name} {local_ref}', whitespace=True)
-
         group_name = normalize_name(name, lower=True, special=True, number=True)
-
         return cls(
             id=element_id(data['id']),
             type=data['type'],
