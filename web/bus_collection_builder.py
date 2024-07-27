@@ -148,7 +148,7 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
                     # expand non-numeric to numeric
                     #  or
                     # expand numeric to numeric when equal
-                    if expand_key_n and expand_key_n != extract_numbers(target_key):
+                    if not expand_key_n.issubset(extract_numbers(target_key)):
                         continue
 
                     target_group = name_groups.get(target_key)

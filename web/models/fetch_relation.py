@@ -89,16 +89,17 @@ class FetchRelationBusStop:
     def from_data(cls, data: dict) -> Self:
         name: str = data['tags'].get('name', '').strip()
         local_ref: str = data['tags'].get('local_ref', '').strip()
+        ref: str = data['tags'].get('ref', '').strip()
 
         # ignore local_ref if it's already part of the name
         if name and local_ref and name.endswith(local_ref):
             local_ref = ''
 
-        # fallback to ref if no name/local_ref is available
-        if not name and not local_ref:
-            name = data['tags'].get('ref', '').strip()
+        # add parentheses to ref if it's not empty
+        if ref:
+            ref = f'({ref})'
 
-        name = normalize_name(f'{name} {local_ref}', whitespace=True)
+        name = normalize_name(f'{name} {local_ref} {ref}', whitespace=True)
         group_name = normalize_name(name, lower=True, special=True, number=True)
         return cls(
             id=element_id(data['id']),
