@@ -229,16 +229,20 @@ def is_bus_explicit(tags: dict[str, str]) -> bool:
     return tags.get('bus') == 'yes'
 
 
-def is_rail_related(tags: dict[str, str]) -> bool:
+def is_any_rail_related(tags: dict[str, str]) -> bool:
     rail_valid = 'railway' in tags
-
-    train_valid = tags.get('train', 'no') in {'yes'}
-
-    subway_valid = tags.get('subway', 'no') in {'yes'}
-
     tram_valid = tags.get('tram', 'no') in {'yes'}
+    train_valid = tags.get('train', 'no') in {'yes'}
+    subway_valid = tags.get('subway', 'no') in {'yes'}
+    return any((rail_valid, tram_valid, train_valid, subway_valid))
 
-    return any((rail_valid, train_valid, subway_valid, tram_valid))
+
+def is_tram_element(tags: dict[str, str]) -> bool:
+    rail_valid = 'railway' in tags
+    tram_valid = tags.get('tram', 'no') in {'yes'}
+    train_valid = tags.get('train', 'no') in {'yes'}
+    subway_valid = tags.get('subway', 'no') in {'yes'}
+    return tram_valid or (rail_valid and not train_valid and not subway_valid)
 
 
 def _merge_relation_tags(element: dict, relation: dict, extra: dict) -> None:
@@ -576,9 +580,9 @@ class Overpass:
         elements_ex = chain(stop_area_platform_elements, stop_area_stop_position_elements, bus_elements)
         elements_ex = preprocess_elements(elements_ex)
         if route_type == 'bus':
-            elements_ex = (e for e in elements_ex if is_bus_explicit(e['tags']) or not is_rail_related(e['tags']))
+            elements_ex = (e for e in elements_ex if is_bus_explicit(e['tags']) or not is_any_rail_related(e['tags']))
         elif route_type == 'tram':
-            elements_ex = (e for e in elements_ex if is_rail_related(e['tags']))
+            elements_ex = (e for e in elements_ex if is_tram_element(e['tags']))
 
         stops = tuple(FetchRelationBusStop.from_data(e) for e in elements_ex)
         bus_stop_collections = build_bus_stop_collections(stops)

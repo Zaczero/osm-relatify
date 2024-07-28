@@ -6,7 +6,7 @@ import sentry_sdk
 SECRET = os.environ['SECRET']
 WEBSITE = os.getenv('WEBSITE', 'https://github.com/Zaczero/osm-relatify')
 
-VERSION = '1.4.1'
+VERSION = '1.4.2'
 CREATED_BY = f'osm-relatify {VERSION}'
 USER_AGENT = f'osm-relatify/{VERSION} (+https://github.com/Zaczero/osm-relatify)'
 
