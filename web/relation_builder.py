@@ -316,10 +316,8 @@ def _update_relations_after_split(
                 ):
                     before_way_id = before_entry['@ref']
                     before_way_id = unique_native_id_map.get(before_way_id, before_way_id)
-                    before_way = parents.ways_map[before_way_id]
-                    before_way['nd'] = before_way.get('nd', [])
-
-                    if not before_way['nd']:
+                    before_way = parents.ways_map.get(before_way_id)
+                    if before_way and not before_way.get('nd'):
                         before_way = None
                 else:
                     before_way = None
@@ -331,10 +329,8 @@ def _update_relations_after_split(
                 ):
                     after_way_id = after_entry['@ref']
                     after_way_id = unique_native_id_map.get(after_way_id, after_way_id)
-                    after_way = parents.ways_map[after_way_id]
-                    after_way['nd'] = after_way.get('nd', [])
-
-                    if not after_way['nd']:
+                    after_way = parents.ways_map.get(after_way_id)
+                    if after_way and not after_way.get('nd'):
                         after_way = None
                 else:
                     after_way = None
