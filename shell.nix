@@ -30,17 +30,23 @@ let
     (writeShellScriptBin "cython-build" "python cython_build.py build_ext --build-lib cython_lib")
     (writeShellScriptBin "cython-clean" "rm -rf build/ cython_lib/*{.c,.html,.so}")
     # -- Misc
-    (writeShellScriptBin "run" "python -m uvicorn main:app --reload")
+    (writeShellScriptBin "run" ''
+      python -m gunicorn web.main:app \
+        --worker-class uvicorn.workers.UvicornWorker \
+        --graceful-timeout 5 \
+        --keep-alive 300 \
+        --access-logfile -
+    '')
     (writeShellScriptBin "make-bundle" ''
       # menu.js
       HASH=$(esbuild static/js/menu.js --bundle --minify | sha256sum | head -c8 ; echo "") && \
       esbuild static/js/menu.js --bundle --minify --sourcemap --charset=utf8 --outfile=static/js/menu.$HASH.js && \
-      find templates -type f -exec sed -i 's|src="/static/js/menu.js" type="module"|src="/static/js/menu.'$HASH'.js"|g' {} \;
+      find templates -type f -exec sed -r 's|src="/static/js/menu\..*?js" type="module"|src="/static/js/menu.'$HASH'.js"|g' -i {} \;
 
       # style.css
       HASH=$(esbuild static/css/style.css --bundle --minify | sha256sum | head -c8 ; echo "") && \
       esbuild static/css/style.css --bundle --minify --sourcemap --charset=utf8 --outfile=static/css/style.$HASH.css && \
-      find templates -type f -exec sed -i 's|href="/static/css/style.css"|href="/static/css/style.'$HASH'.css"|g' {} \;
+      find templates -type f -exec sed -r 's|href="/static/css/style\..*?css"|href="/static/css/style.'$HASH'.css"|g' -i {} \;
     '')
     (writeShellScriptBin "nixpkgs-update" ''
       set -e
