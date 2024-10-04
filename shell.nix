@@ -27,8 +27,8 @@ let
 
     # Scripts
     # -- Cython
-    (writeShellScriptBin "cython-build" "python cython_build.py build_ext --build-lib cython_lib")
-    (writeShellScriptBin "cython-clean" "rm -rf build/ cython_lib/*{.c,.html,.so}")
+    (writeShellScriptBin "cython-build" "cd cython_lib && python setup.py build_ext --inplace")
+    (writeShellScriptBin "cython-clean" "rm -rf cython_lib/build/ cython_lib/*{.c,.html,.so}")
     # -- Misc
     (writeShellScriptBin "run" ''
       python -m gunicorn main:app \
