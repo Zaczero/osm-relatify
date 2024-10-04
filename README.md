@@ -1,4 +1,4 @@
-# <img height="24" src="https://github.com/Zaczero/osm-relatify/blob/main/web/static/img/favicon/256.webp?raw=true" alt="🗺️"> OSM Relatify
+# <img height="24" src="https://github.com/Zaczero/osm-relatify/blob/main/static/img/favicon/256.webp?raw=true" alt="🗺️"> OSM Relatify
 
 ![Python version](https://shields.monicz.dev/badge/python-v3.12-blue)
 [![Liberapay Patrons](https://shields.monicz.dev/liberapay/patrons/Zaczero?logo=liberapay)](https://liberapay.com/Zaczero/)
