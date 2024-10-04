@@ -58,7 +58,7 @@ app.mount('/static', StaticFiles(directory='static', html=True), name='static')
 cookie_max_age = 31536000  # 1 year
 templates = Jinja2Templates(directory='templates', auto_reload=TEST_ENV)
 
-process_executoru = ProcessPoolExecutor(CALC_ROUTE_MAX_PROCESSES)
+process_executor = ProcessPoolExecutor(CALC_ROUTE_MAX_PROCESSES)
 openstreetmap = OpenStreetMap()
 overpass = Overpass()
 
