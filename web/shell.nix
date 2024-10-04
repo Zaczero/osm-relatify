@@ -1,8 +1,8 @@
-{ isDevelopment ? true }:
+{}:
 
 let
   # Update packages with `nixpkgs-update` command
-  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/48bacf585a51d953def8bff32087970f273052e2.tar.gz") { };
+  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a.tar.gz") { };
 
   pythonLibs = with pkgs; [
     stdenv.cc.cc.lib
@@ -10,10 +10,7 @@ let
   ];
   python' = with pkgs; (symlinkJoin {
     name = "python";
-    paths = [
-      # Enable compiler optimizations when in production
-      (if isDevelopment then python312 else python312.override { enableOptimizations = true; })
-    ];
+    paths = [ python312 ];
     buildInputs = [ makeWrapper ];
     postBuild = ''
       wrapProgram "$out/bin/python3.12" --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath pythonLibs}"
@@ -22,7 +19,7 @@ let
 
   packages' = with pkgs; [
     python'
-    poetry
+    uv
     ruff
     biome
     gcc14
@@ -30,14 +27,11 @@ let
 
     # Scripts
     # -- Cython
-    (writeShellScriptBin "cython-build" "python setup.py build_ext --build-lib cython_lib")
+    (writeShellScriptBin "cython-build" "python cython_build.py build_ext --build-lib cython_lib")
     (writeShellScriptBin "cython-clean" "rm -rf build/ cython_lib/*{.c,.html,.so}")
     # -- Misc
     (writeShellScriptBin "run" "python -m uvicorn main:app --reload")
-    (writeShellScriptBin "make-version" "sed -i -E \"s|VERSION = '([0-9.]+)'|VERSION = '\\1.$(date +%y%m%d)'|\" config.py")
     (writeShellScriptBin "make-bundle" ''
-      chmod +w static/js static/css templates
-
       # menu.js
       HASH=$(esbuild static/js/menu.js --bundle --minify | sha256sum | head -c8 ; echo "") && \
       esbuild static/js/menu.js --bundle --minify --sourcemap --charset=utf8 --outfile=static/js/menu.$HASH.js && \
@@ -50,46 +44,43 @@ let
     '')
     (writeShellScriptBin "nixpkgs-update" ''
       set -e
-      hash=$(git ls-remote https://github.com/NixOS/nixpkgs nixpkgs-unstable | cut -f 1)
+      hash=$(
+        curl --silent --location \
+        https://prometheus.nixos.org/api/v1/query \
+        -d "query=channel_revision{channel=\"nixpkgs-unstable\"}" | \
+        grep --only-matching --extended-regexp "[0-9a-f]{40}")
       sed -i -E "s|/nixpkgs/archive/[0-9a-f]{40}\.tar\.gz|/nixpkgs/archive/$hash.tar.gz|" shell.nix
       echo "Nixpkgs updated to $hash"
     '')
-    (writeShellScriptBin "docker-build-push" ''
-      set -e
-      cython-clean && cython-build
-      if command -v podman &> /dev/null; then docker() { podman "$@"; } fi
-      docker push $(docker load < $(nix-build --no-out-link) | sed -En 's/Loaded image: (\S+)/\1/p')
-    '')
   ];
 
-  shell' = with pkgs; lib.optionalString isDevelopment ''
+  shell' = ''
+    export PYTHONNOUSERSITE=1
+    export TZ=UTC
+
     current_python=$(readlink -e .venv/bin/python || echo "")
     current_python=''${current_python%/bin/*}
     [ "$current_python" != "${python'}" ] && rm -rf .venv/
 
     echo "Installing Python dependencies"
-    export POETRY_VIRTUALENVS_IN_PROJECT=1
-    poetry env use "${python'}/bin/python"
-    poetry install --no-root --compile
+    export UV_COMPILE_BYTECODE=1
+    export UV_PYTHON="${python'}/bin/python"
+    uv sync --frozen
 
     echo "Activating Python virtual environment"
     source .venv/bin/activate
 
     # Development environment variables
-    export PYTHONNOUSERSITE=1
-    export TZ=UTC
     export TEST_ENV=1
-    export SECRET=development-secret
 
     if [ -f .env ]; then
       echo "Loading .env file"
       set -o allexport
       source .env set
       set +o allexport
+    else
+      echo "Skipped loading .env file (not found)"
     fi
-  '' + lib.optionalString (!isDevelopment) ''
-    make-version
-    make-bundle
   '';
 in
 pkgs.mkShellNoCC {

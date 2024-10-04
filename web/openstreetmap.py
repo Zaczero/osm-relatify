@@ -4,7 +4,6 @@ from dataclasses import dataclass
 import httpx
 import xmltodict
 from asyncache import cached
-from authlib.integrations.httpx_client import OAuth2Auth
 from cachetools import TTLCache
 
 from config import CHANGESET_ID_PLACEHOLDER, TAG_MAX_LENGTH
@@ -20,16 +19,11 @@ class UploadResult:
 
 
 class OpenStreetMap:
-    def __init__(self, *, username: str | None = None, password: str | None = None, oauth_token: dict | None = None):
-        if oauth_token:
-            self.auth = OAuth2Auth(oauth_token)
-        elif username and password:
-            self.auth = (username, password)
-        else:
-            self.auth = None
+    def __init__(self, *, access_token: str | None = None):
+        self.headers = {'Authorization': f'Bearer {access_token}'} if access_token else {}
 
     def _get_http_client(self) -> httpx.AsyncClient:
-        return get_http_client('https://api.openstreetmap.org/api', auth=self.auth)
+        return get_http_client('https://api.openstreetmap.org/api', headers=self.headers)
 
     async def get_changeset_maxsize(self) -> int:
         async with self._get_http_client() as http:
@@ -72,15 +66,11 @@ class OpenStreetMap:
         else:
             return ensure_list(xmltodict.parse(r.text)['osm'][elements_type[:-1]])
 
-    async def get_authorized_user(self) -> dict | None:
-        if self.auth is None:
-            return None
-
+    async def get_authorized_user(self) -> dict:
         async with self._get_http_client() as http:
             r = await http.get('/0.6/user/details.json')
             r.raise_for_status()
-
-        return r.json()['user']
+            return r.json()['user']
 
     async def upload_osm_change(self, osm_change: str, tags: dict[str, str]) -> UploadResult:
         assert 'comment' in tags, 'You must provide a comment'

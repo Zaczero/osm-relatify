@@ -427,7 +427,7 @@ class Overpass:
     @cached(TTLCache(maxsize=1024, ttl=7200))  # 2 hours
     async def _query_relation_history_post(
         self,
-        session: str,
+        session: str,  # cache busting  # noqa: ARG002
         query: str,
         timeout: float,
     ) -> list[list[dict]]:

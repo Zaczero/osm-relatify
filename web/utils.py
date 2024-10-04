@@ -24,20 +24,14 @@ def print_run_time(message: str | list) -> Generator[None, None, None]:
         print(f'[⏱️] {message} took {elapsed_time:.3f}s')
 
 
-def get_http_client(base_url: str = '', *, auth: tuple | None = None, headers: dict | None = None) -> httpx.AsyncClient:
-    if not headers:
+def get_http_client(base_url: str = '', *, headers: dict | None = None) -> httpx.AsyncClient:
+    if headers is None:
         headers = {}
-
-    headers['User-Agent'] = USER_AGENT
-
     return httpx.AsyncClient(
         base_url=base_url,
         follow_redirects=True,
-        http1=True,
-        http2=True,
         timeout=30,
-        auth=auth,
-        headers=headers,
+        headers={'User-Agent': USER_AGENT, **headers},
     )
 
 

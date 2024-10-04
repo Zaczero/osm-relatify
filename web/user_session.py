@@ -1,4 +1,3 @@
-from authlib.integrations.httpx_client import OAuth2Auth
 from cachetools import TTLCache
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.websockets import WebSocket
@@ -12,25 +11,26 @@ _user_cache = TTLCache(maxsize=1024, ttl=7200)  # 2 hours
 @retry(wait=wait_exponential(), stop=stop_after_attempt(3), reraise=True)
 async def fetch_user_details(request: Request = None, websocket: WebSocket = None) -> dict | None:
     if request is not None:
-        session = request.session
+        cookies = request.cookies
     elif websocket is not None:
-        session = websocket.session
+        cookies = websocket.cookies
     else:
         raise ValueError('Either request or websocket must be provided')
 
     try:
-        token = session['token']
+        access_token = cookies['access_token']
     except KeyError:
         return None
 
-    cache_key = token['access_token']
-
     try:
-        return _user_cache[cache_key]
+        return _user_cache[access_token]
     except KeyError:
         pass
 
-    async with get_http_client('https://api.openstreetmap.org/api', auth=OAuth2Auth(token)) as http:
+    async with get_http_client(
+        'https://api.openstreetmap.org/api',
+        headers={'Authorization': f'Bearer {access_token}'},
+    ) as http:
         response = await http.get('/0.6/user/details.json')
 
     if not response.is_success:
@@ -44,7 +44,7 @@ async def fetch_user_details(request: Request = None, websocket: WebSocket = Non
     if 'img' not in user:
         user['img'] = {'href': None}
 
-    _user_cache[cache_key] = user
+    _user_cache[access_token] = user
     return user
 
 
@@ -54,21 +54,8 @@ async def require_user_details(user=Depends(fetch_user_details)) -> dict:
     return user
 
 
-def require_user_token(request: Request) -> dict:
+def require_user_access_token(request: Request) -> str:
     try:
-        return request.session['token']
+        return request.cookies['access_token']
     except KeyError as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Unauthorized') from e
-
-
-def set_user_token(request: Request, token: dict) -> bool:
-    request.session['token'] = token
-    return True
-
-
-def unset_user_token(request: Request) -> bool:
-    try:
-        del request.session['token']
-        return True
-    except KeyError:
-        return False
