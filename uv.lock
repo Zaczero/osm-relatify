@@ -447,7 +447,7 @@ requires-dist = [
     { name = "cython" },
     { name = "dacite" },
     { name = "fastapi" },
-    { name = "githead", specifier = ">=1.0.0" },
+    { name = "githead" },
     { name = "gunicorn" },
     { name = "httpx", extras = ["brotli", "zstd"] },
     { name = "jinja2" },
