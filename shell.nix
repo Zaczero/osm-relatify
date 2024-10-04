@@ -31,7 +31,7 @@ let
     (writeShellScriptBin "cython-clean" "rm -rf build/ cython_lib/*{.c,.html,.so}")
     # -- Misc
     (writeShellScriptBin "run" ''
-      python -m gunicorn web.main:app \
+      python -m gunicorn main:app \
         --worker-class uvicorn.workers.UvicornWorker \
         --graceful-timeout 5 \
         --keep-alive 300 \
