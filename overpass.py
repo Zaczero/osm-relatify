@@ -8,6 +8,8 @@ import httpx
 import xmltodict
 from asyncache import cached
 from cachetools import TTLCache
+from fastapi import HTTPException
+from starlette import status
 
 from bus_collection_builder import build_bus_stop_collections
 from config import DOWNLOAD_RELATION_GRID_CELL_EXPAND, DOWNLOAD_RELATION_WAY_BB_EXPAND, OVERPASS_API_INTERPRETER
@@ -499,6 +501,8 @@ class Overpass:
                 r.raise_for_status()
 
             elements: list[dict] = r.json()['elements']
+            if not elements:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Relation is empty, which is not supported')
 
             relation_way_members = {e['id'] for e in elements}
             union_grid_cells_set: set[Cell] = set()
