@@ -1,6 +1,6 @@
 # <img height="24" src="https://github.com/Zaczero/osm-relatify/blob/main/static/img/favicon/256.webp?raw=true" alt="🗺️"> OSM Relatify
 
-![Python version](https://shields.monicz.dev/badge/python-v3.12-blue)
+![Python version](https://shields.monicz.dev/badge/python-v3.13-blue)
 [![Liberapay Patrons](https://shields.monicz.dev/liberapay/patrons/Zaczero?logo=liberapay)](https://liberapay.com/Zaczero/)
 [![GitHub Sponsors](https://shields.monicz.dev/github/sponsors/Zaczero?logo=github&label=Sponsors&color=%23db61a2)](https://github.com/sponsors/Zaczero)
 [![GitHub repo stars](https://shields.monicz.dev/github/stars/Zaczero/osm-relatify?style=social)](https://github.com/Zaczero/osm-relatify)
