@@ -22,7 +22,7 @@ dependencies = [
   "xmltodict",
 ]
 name = "osm-relatify"
-requires-python = "~=3.12"
+requires-python = "~=3.13"
 version = "0.0.0"
 
 [tool.uv]
@@ -61,7 +61,7 @@ exclude = [
 
 indent-width = 4
 line-length = 120
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 ignore = ["B008", "S101"]
@@ -107,12 +107,8 @@ select = [
   "YTT",   # flake8-2020
 ]
 
-# Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
 unfixable = []
-
-# Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.format]
 indent-style = "space"

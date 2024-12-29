@@ -2,18 +2,19 @@
 
 let
   # Update packages with `nixpkgs-update` command
-  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a.tar.gz") { };
+  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/7cc0bff31a3a705d3ac4fdceb030a17239412210.tar.gz") { };
 
+  stdenv' = pkgs.gcc14Stdenv;
   pythonLibs = with pkgs; [
-    stdenv.cc.cc.lib
     zlib.out
+    stdenv'.cc.cc.lib
   ];
   python' = with pkgs; (symlinkJoin {
     name = "python";
-    paths = [ python312 ];
+    paths = [ python313 ];
     buildInputs = [ makeWrapper ];
     postBuild = ''
-      wrapProgram "$out/bin/python3.12" --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath pythonLibs}"
+      wrapProgram "$out/bin/python3.13" --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath pythonLibs}"
     '';
   });
 
@@ -22,8 +23,9 @@ let
     uv
     ruff
     biome
-    gcc14
     esbuild
+    coreutils
+    findutils
 
     # Scripts
     # -- Cython
@@ -90,7 +92,7 @@ let
     fi
   '';
 in
-pkgs.mkShellNoCC {
+pkgs.mkShell.override { stdenv = stdenv'; } {
   buildInputs = packages';
   shellHook = shell';
 }
