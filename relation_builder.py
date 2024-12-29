@@ -479,8 +479,8 @@ async def build_osm_change(
                     way_data_nd = way_data.get('nd')
                     if (
                         way_data_nd
-                        and way_data_nd[0]['@ref'] == new_data['nd'][0]['@ref']
-                        and way_data_nd[-1]['@ref'] == new_data['nd'][-1]['@ref']
+                        and int(way_data_nd[0]['@ref']) == new_data['nd'][0]['@ref']
+                        and int(way_data_nd[-1]['@ref']) == new_data['nd'][-1]['@ref']
                     ):
                         raise HTTPException(
                             status.HTTP_409_CONFLICT,
