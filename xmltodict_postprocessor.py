@@ -1,8 +1,8 @@
 def postprocessor(_, key, value):
-    if key in ('@id', '@ref', '@changeset', '@uid'):
+    if key in {'@id', '@ref', '@changeset', '@uid'}:
         return key, int(value)
 
-    if key in ('@version',):
+    if key in {'@version'}:
         try:
             return key, int(value)
         except ValueError:
