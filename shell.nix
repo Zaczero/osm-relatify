@@ -65,6 +65,7 @@ let
   shell' = with pkgs; ''
     export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
     export PYTHONNOUSERSITE=1
+    export PYTHONPATH=""
     export TZ=UTC
 
     current_python=$(readlink -e .venv/bin/python || echo "")
