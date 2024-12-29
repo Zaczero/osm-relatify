@@ -201,25 +201,25 @@ def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationM
     for i, collection in enumerate(route.busStops):
         is_first = i == 0
         is_last = i == len(route.busStops) - 1
-        suffix = '' if route.roundtrip else ('_entry_only' if is_first else ('_exit_only' if is_last else ''))
+        suffix = '_entry_only' if is_first else ('_exit_only' if is_last else '')
 
         if collection.stop is not None:
             role = 'stop' + suffix
-
             member = id_relation_member_map.get(collection.stop.id)
             if member is not None and member.role.startswith(role):
                 role = member.role
-
+            if route.roundtrip and role in {'stop_entry_only', 'stop_exit_only'}:
+                role = 'stop'
             last_stop_member = RelationMember(id=collection.stop.id, type=collection.stop.type, role=role)
             members.append(last_stop_member)
 
         if collection.platform is not None:
             role = 'platform' + suffix
-
             member = id_relation_member_map.get(collection.platform.id)
             if member is not None and member.role.startswith(role):
                 role = member.role
-
+            if route.roundtrip and role in {'platform_entry_only', 'platform_exit_only'}:
+                role = 'platform'
             last_platform_member = RelationMember(id=collection.platform.id, type=collection.platform.type, role=role)
             members.append(last_platform_member)
 
