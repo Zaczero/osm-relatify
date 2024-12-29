@@ -199,6 +199,8 @@ def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationM
     last_platform_member: RelationMember | None = None
 
     for i, collection in enumerate(route.busStops):
+        last_stop_member = None
+        last_platform_member = None
         is_first = i == 0
         is_last = i == len(route.busStops) - 1
         suffix = '_entry_only' if is_first else ('_exit_only' if is_last else '')
