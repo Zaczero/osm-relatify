@@ -1,6 +1,6 @@
 import asyncio
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import replace
 from itertools import chain, cycle, islice, zip_longest
 from typing import NamedTuple
@@ -51,9 +51,9 @@ def interpolate_latLng(
     if result_size > 1:
         delta_lat_rad = (latLng2_rad[0] - latLng1_rad[0]) / result_size
         delta_lng_rad = (latLng2_rad[1] - latLng1_rad[1]) / result_size
-
-        for i in range(1, result_size):
-            result.append((latLng1_rad[0] + delta_lat_rad * i, latLng1_rad[1] + delta_lng_rad * i))
+        result.extend(
+            (latLng1_rad[0] + delta_lat_rad * i, latLng1_rad[1] + delta_lng_rad * i) for i in range(1, result_size)
+        )
 
     return result
 
@@ -82,10 +82,10 @@ def sort_bus_on_path(
     collections_latLng_rad = tuple(radians_tuple(collection.best.latLng) for collection in bus_stop_collections)
     distances, idxs = tree.query(collections_latLng_rad, k=1, return_distance=True, sort_results=False)
 
-    result = []
+    result: list[SortedBusEntry] = []
 
     for collection, collection_latLng_rad, distance, idx in zip(
-        bus_stop_collections, collections_latLng_rad, distances, idxs
+        bus_stop_collections, collections_latLng_rad, distances, idxs, strict=False
     ):
         distance = distance[0] * 6_371_000  # earth radius
         idx = idx[0]
@@ -132,12 +132,13 @@ def _unsplit_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
     while i < len(way_ids_parts):
         way_id_parts = way_ids_parts[i]
 
-        # skip: not splitted way
+        # skip: not-split way
         if way_id_parts.extra_num is None:
             i += 1
             continue
+        assert way_id_parts.max_num is not None
 
-        # skip and blacklist: mid-splitted way
+        # skip and blacklist: mid-split way
         if 1 < way_id_parts.extra_num < way_id_parts.max_num:
             simplify_blacklist.append(way_id_parts.id)
             i += 1
@@ -165,7 +166,7 @@ def _unsplit_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
         i += way_id_parts.max_num
 
     simplify_whitelist.difference_update(simplify_blacklist)
-    result = []
+    result: list[ElementId] = []
 
     # pass 2, generate results
     i = 0
@@ -177,6 +178,7 @@ def _unsplit_way_ids(way_ids: list[ElementId]) -> list[ElementId]:
             result.append(way_id)
             i += 1
             continue
+        assert way_id_parts.max_num is not None
 
         # simplify
         result.append(element_id(way_id_parts.id))
@@ -192,46 +194,41 @@ def get_relation_members(relation: dict) -> list[RelationMember]:
 def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationMember]) -> FinalRoute:
     id_relation_member_map = {member.id: member for member in relation_members}
 
-    members = []
+    members: list[RelationMember] = []
+    last_stop_member: RelationMember | None = None
+    last_platform_member: RelationMember | None = None
 
     for i, collection in enumerate(route.busStops):
         is_first = i == 0
         is_last = i == len(route.busStops) - 1
-
-        if route.roundtrip:
-            suffix = ''
-        else:
-            suffix = '_entry_only' if is_first else ('_exit_only' if is_last else '')
-
-        stop_member = None
-        platform_member = None
+        suffix = '' if route.roundtrip else ('_entry_only' if is_first else ('_exit_only' if is_last else ''))
 
         if collection.stop is not None:
             role = 'stop' + suffix
 
-            if (member := id_relation_member_map.get(collection.stop.id, None)) is not None:
-                if member.role.startswith(role):
-                    role = member.role
+            member = id_relation_member_map.get(collection.stop.id)
+            if member is not None and member.role.startswith(role):
+                role = member.role
 
-            stop_member = RelationMember(id=collection.stop.id, type=collection.stop.type, role=role)
-            members.append(stop_member)
+            last_stop_member = RelationMember(id=collection.stop.id, type=collection.stop.type, role=role)
+            members.append(last_stop_member)
 
         if collection.platform is not None:
             role = 'platform' + suffix
 
-            if (member := id_relation_member_map.get(collection.platform.id, None)) is not None:
-                if member.role.startswith(role):
-                    role = member.role
+            member = id_relation_member_map.get(collection.platform.id)
+            if member is not None and member.role.startswith(role):
+                role = member.role
 
-            platform_member = RelationMember(id=collection.platform.id, type=collection.platform.type, role=role)
-            members.append(platform_member)
+            last_platform_member = RelationMember(id=collection.platform.id, type=collection.platform.type, role=role)
+            members.append(last_platform_member)
 
     if route.roundtrip and members:
         # order: stop, platform
-        if platform_member is not None:
-            members.insert(0, platform_member)
-        if stop_member is not None:
-            members.insert(0, stop_member)
+        if last_platform_member is not None:
+            members.insert(0, last_platform_member)
+        if last_stop_member is not None:
+            members.insert(0, last_stop_member)
 
     way_ids = [route_way.way.id for route_way in route.ways]
     way_ids = _unsplit_way_ids(way_ids)
@@ -239,9 +236,9 @@ def sort_and_upgrade_members(route: FinalRoute, relation_members: list[RelationM
     for way_id in way_ids:
         role = ''
 
-        if (member := id_relation_member_map.get(way_id)) is not None:
-            if member.role not in {'route', 'forward', 'backward'}:
-                role = member.role
+        member = id_relation_member_map.get(way_id)
+        if member is not None and member.role not in {'route', 'forward', 'backward'}:
+            role = member.role
 
         members.append(RelationMember(id=way_id, type='way', role=role))
 
@@ -253,9 +250,7 @@ def _initialize_osm_change_structure() -> dict:
         'osmChange': {
             '@version': 0.6,
             '@generator': CREATED_BY,
-            'create': {
-                'way': [],
-            },
+            'create': {'way': []},
             'modify': {'way': [], 'relation': []},
         }
     }
@@ -277,7 +272,7 @@ def _update_relations_after_split(
     id_way_map: dict[ElementId, FetchRelationElement],
     element_id_unique_map: dict[ElementId, int],
     unique_native_id_map: dict[int, int],
-) -> list[dict]:
+) -> Collection[dict]:
     result: dict[int, dict] = {}
 
     # iterate over the split ways
@@ -366,6 +361,7 @@ def _update_relations_after_split(
                         first_element_nd, last_element_nd = element.nodes[-1], element.nodes[0]
 
                     if not safe_to_insert:
+                        assert before_way is not None
                         safe_to_insert = any(before_way['nd'][check]['@ref'] == first_element_nd for check in (0, -1))
 
                     if not safe_to_insert:
@@ -388,9 +384,10 @@ def _update_relations_after_split(
                         break
 
                     # stop inserting if the next way is the after way
-                    if after_way is not None:
-                        if any(after_way['nd'][check]['@ref'] == last_element_nd for check in (0, -1)):
-                            break
+                    if (after_way is not None) and any(
+                        after_way['nd'][check]['@ref'] == last_element_nd for check in (0, -1)
+                    ):
+                        break
 
                 # fallback to dummy insert if none were inserted
                 if insert_count == 0:
@@ -414,7 +411,7 @@ def _update_relations_after_split(
 async def build_osm_change(
     relation_id: int, route: FinalRoute, include_changeset_id: bool, overpass: Overpass, osm: OpenStreetMap
 ) -> str:
-    split_ways: set[int] = set()
+    split_ways_mutable: set[int] = set()
     native_id_element_ids_map: dict[int, dict[int, ElementId]] = defaultdict(dict)
     element_id_unique_map: dict[ElementId, int] = {}
     unique_native_id_map: dict[int, int] = {}
@@ -427,7 +424,7 @@ async def build_osm_change(
         if element_id_parts.extra_num is None:
             continue
 
-        split_ways.add(element_id_parts.id)
+        split_ways_mutable.add(element_id_parts.id)
         native_id_element_ids_map[element_id_parts.id][element_id_parts.extra_num] = element_id
 
         if element_id in element_id_unique_map:
@@ -443,15 +440,14 @@ async def build_osm_change(
         if (1 not in group) or len(group) != split_element_id(group[1]).max_num:
             raise AssertionError(f'Split ways are not complete: {", ".join(f"{k}={v}" for k, v in group.items())}')
 
-    split_ways = frozenset(split_ways)
-
-    parents_task = asyncio.create_task(overpass.query_parents(split_ways)) if split_ways else None
-    ways_task = asyncio.create_task(osm.get_ways(map(str, split_ways), json=False)) if split_ways else None
+    split_ways = frozenset(split_ways_mutable)
     relation_task = asyncio.create_task(osm.get_relation(relation_id, json=False))
 
     result = _initialize_osm_change_structure()
 
-    if ways_task:
+    if split_ways:
+        parents_task = asyncio.create_task(overpass.query_parents(split_ways))
+        ways_task = asyncio.create_task(osm.get_ways(map(str, split_ways), json=False))
         ways = await ways_task
 
         id_way_map = dict(

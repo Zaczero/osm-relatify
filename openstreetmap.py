@@ -43,17 +43,17 @@ class OpenStreetMap:
     async def get_node(self, node_id: str | int, *, json: bool = True) -> dict:
         return (await self._get_elements('nodes', (node_id,), json=json))[0]
 
-    async def get_relations(self, relation_ids: list[str | int], *, json: bool = True) -> list[dict]:
+    async def get_relations(self, relation_ids: Iterable[str | int], *, json: bool = True) -> list[dict]:
         return await self._get_elements('relations', relation_ids, json=json)
 
-    async def get_ways(self, way_ids: list[str | int], *, json: bool = True) -> list[dict]:
+    async def get_ways(self, way_ids: Iterable[str | int], *, json: bool = True) -> list[dict]:
         return await self._get_elements('ways', way_ids, json=json)
 
-    async def get_nodes(self, node_ids: list[str | int], *, json: bool = True) -> list[dict]:
+    async def get_nodes(self, node_ids: Iterable[str | int], *, json: bool = True) -> list[dict]:
         return await self._get_elements('nodes', node_ids, json=json)
 
     @cached(TTLCache(maxsize=1024, ttl=60))
-    async def _get_elements(self, elements_type: str, element_ids: Iterable[str], json: bool) -> list[dict]:
+    async def _get_elements(self, elements_type: str, element_ids: Iterable[str | int], json: bool) -> list[dict]:
         async with self._get_http_client() as http:
             r = await http.get(
                 f'/0.6/{elements_type}{".json" if json else ""}',
