@@ -15,7 +15,7 @@ if TEST_ENV:
 
 # Dedicated instance unavailable? Pick one from the public list:
 # https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances
-OVERPASS_API_INTERPRETER = os.getenv('OVERPASS_API_INTERPRETER', 'https://overpass.monicz.dev/api/interpreter')
+OVERPASS_API_INTERPRETER = os.getenv('OVERPASS_API_INTERPRETER', 'https://overpass-api.de/api/interpreter')
 
 TAG_MAX_LENGTH = 255
 
