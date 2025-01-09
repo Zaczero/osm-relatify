@@ -1,6 +1,6 @@
 import asyncio
 from collections import defaultdict
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import replace
 from itertools import chain, cycle, islice, zip_longest
 from typing import NamedTuple
@@ -29,37 +29,37 @@ class SortedBusEntry(NamedTuple):
 
 
 def is_right_hand_side(
-    latLng1: tuple[float, float], latLng2: tuple[float, float], latLngTest: tuple[float, float]
+    lat_lon_start: tuple[float, float],
+    lat_lon_end: tuple[float, float],
+    lat_lon_test: tuple[float, float],
 ) -> bool | None:
-    if latLng1 == latLngTest or latLng2 == latLngTest:
+    if lat_lon_start == lat_lon_test or lat_lon_end == lat_lon_test:
         return None
-
-    v1 = (latLng2[0] - latLng1[0], latLng2[1] - latLng1[1])
-    v2 = (latLngTest[0] - latLng2[0], latLngTest[1] - latLng2[1])
-
+    v1 = (lat_lon_end[0] - lat_lon_start[0], lat_lon_end[1] - lat_lon_start[1])
+    v2 = (lat_lon_test[0] - lat_lon_end[0], lat_lon_test[1] - lat_lon_end[1])
     cross_product_z = v1[0] * v2[1] - v1[1] * v2[0]
     return cross_product_z > 0
 
 
 def interpolate_latLng(
-    latLng1_rad: tuple[float, float], latLng2_rad: tuple[float, float], threshold: float
+    lat_lon_start_rad: tuple[float, float],
+    lat_lon_stop_rad: tuple[float, float],
+    threshold: float,
 ) -> list[tuple[float, float]]:
-    distance = haversine_distance(latLng1_rad, latLng2_rad, unit_radians=True)
+    distance = haversine_distance(lat_lon_start_rad, lat_lon_stop_rad, unit_radians=True)
     result_size = int(distance / threshold) + 1
-    result = [latLng1_rad]
-
-    if result_size > 1:
-        delta_lat_rad = (latLng2_rad[0] - latLng1_rad[0]) / result_size
-        delta_lng_rad = (latLng2_rad[1] - latLng1_rad[1]) / result_size
-        result.extend(
-            (latLng1_rad[0] + delta_lat_rad * i, latLng1_rad[1] + delta_lng_rad * i) for i in range(1, result_size)
-        )
-
-    return result
+    if result_size == 1:
+        return [lat_lon_start_rad]
+    delta_lat_rad = (lat_lon_stop_rad[0] - lat_lon_start_rad[0]) / result_size
+    delta_lon_rad = (lat_lon_stop_rad[1] - lat_lon_start_rad[1]) / result_size
+    return [
+        (lat_lon_start_rad[0] + delta_lat_rad * i, lat_lon_start_rad[1] + delta_lon_rad * i)  #
+        for i in range(result_size)
+    ]
 
 
 def sort_bus_on_path(
-    bus_stop_collections: list[FetchRelationBusStopCollection], ways: Iterable[FetchRelationElement]
+    bus_stop_collections: Sequence[FetchRelationBusStopCollection], ways: Iterable[FetchRelationElement]
 ) -> list[SortedBusEntry]:
     if not bus_stop_collections:
         return []

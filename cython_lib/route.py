@@ -143,79 +143,64 @@ class BestPathCollection(NamedTuple):
     invalid: BestPath
     valid: BestPath
 
-    def merge(self, other: Self, ways: dict[ElementId, FetchRelationElement]) -> Self:
+    def merge(self, other: Self, ways: dict[ElementId, FetchRelationElement]) -> 'BestPathCollection':
         return BestPathCollection(
             invalid=self.invalid.select_best(other.invalid),
             valid=self.valid.select_best(other.valid),
         )
 
 
-def get_way_endpoints(
-    latlons: Sequence[tuple[cython.double, cython.double]],
-) -> tuple[tuple[cython.double, cython.double], tuple[cython.double, cython.double]]:
-    return latlons[0], latlons[-1]
-
-
 def build_graph(ways: dict[ElementId, FetchRelationElement]) -> dict[GraphKey, GraphValue]:
-    graph: dict[GraphKey, list[GraphKey] | GraphValue] = {}
+    convert_graph: dict[GraphKey, list[GraphKey]] = {}
 
     for way_id, way in ways.items():
-        start, end = get_way_endpoints(way.latLngs)
-        start_key, stop_key = (way_id, BOOL_START), (way_id, BOOL_END)
 
         def get_neighbors_at(latlon: tuple[cython.double, cython.double]) -> list[GraphKey]:
-            neighbors = []
-
+            neighbors: list[GraphKey] = []
             for connected_way_id in way.connectedTo:  # noqa: B023
                 connected_way = ways.get(connected_way_id)
-
-                # skip non-member ways
-                if not connected_way:
+                if not connected_way:  # skip non-member ways
                     continue
-
-                connected_start, connected_end = get_way_endpoints(connected_way.latLngs)
-
+                connected_start = connected_way.latLngs[0]
+                connected_end = connected_way.latLngs[-1]
                 if latlon == connected_start:
                     neighbors.append(GraphKey(connected_way_id, BOOL_START))
                 elif latlon == connected_end and not connected_way.oneway:
                     neighbors.append(GraphKey(connected_way_id, BOOL_END))
-                else:
-                    # connected via other endpoint
+                else:  # connected via other endpoint
                     continue
-
             return neighbors
 
-        graph[start_key] = get_neighbors_at(start)
-        graph[stop_key] = get_neighbors_at(end)
+        start = way.latLngs[0]
+        end = way.latLngs[-1]
+        convert_graph[GraphKey(way_id, BOOL_START)] = get_neighbors_at(start)
+        convert_graph[GraphKey(way_id, BOOL_END)] = get_neighbors_at(end)
 
-    convert_keys = set(graph.keys())
     intersection_num: cython.int = -1
-
-    while convert_keys:
+    result: dict[GraphKey, GraphValue] = {}
+    while convert_graph:
         intersection_num += 1
-
-        key = convert_keys.pop()
-        neighbors = graph[key]
-        graph[key] = GraphValue(intersection_num, tuple(neighbors))
-
+        key, neighbors = convert_graph.popitem()
+        result[key] = GraphValue(intersection_num, tuple(neighbors))
         for neighbor in neighbors:
-            if neighbor in convert_keys:
+            if neighbor in convert_graph:
                 # normal convert
-                convert_keys.remove(neighbor)
-                graph[neighbor] = GraphValue(intersection_num, tuple(graph[neighbor]))
+                neighbor_neighbors = convert_graph.pop(neighbor)
+                result[neighbor] = GraphValue(intersection_num, tuple(neighbor_neighbors))
             else:
                 # merge convert (happens due to oneway)
-                graph[neighbor] = graph[neighbor]._replace(intersection_id=intersection_num)
-
-    return graph
+                result[neighbor] = result[neighbor]._replace(intersection_id=intersection_num)
+    return result
 
 
 def angle_between_ways(
     latlons1: Sequence[tuple[cython.double, cython.double]],
     latlons2: Sequence[tuple[cython.double, cython.double]],
 ) -> cython.double:
-    start1, end1 = get_way_endpoints(latlons1)
-    start2, end2 = get_way_endpoints(latlons2)
+    start1 = latlons1[0]
+    end1 = latlons1[-1]
+    start2 = latlons2[0]
+    end2 = latlons2[-1]
 
     # consider very end segments for angle calculation
     if end1 == start2:
@@ -256,7 +241,6 @@ def angle_between_ways(
     # law of cosines
     cos_angle = (d12 * d12 + d23 * d23 - d13 * d13) / (2 * d12 * d23)
     angle = _degrees(acos(min(max(cos_angle, -1), 1)))
-
     return angle
 
 
@@ -324,6 +308,7 @@ def modified_dfs_worker(
     max_iter: cython.int,
 ) -> tuple[list[StackElement], BestPathCollection]:
     message_ref = [f'Worker with {len(stack)} stack size']
+    current_iter = 0
 
     with print_run_time(message_ref):
         for current_iter in range(1, max_iter + 1):  # noqa: B007
@@ -532,8 +517,6 @@ async def modified_dfs(
         max_iter=sync_max_iter,
     )
 
-    tasks = []
-
     async def worker(
         stack_slice: list[StackElement],
         best_path: BestPathCollection,
@@ -556,6 +539,7 @@ async def modified_dfs(
             ),
         )
 
+    tasks: list[asyncio.Task] = []
     while stack or tasks:
         stack_slices_len_target = n_processes - len(tasks)
         stack_slice_size_target, remainder = divmod(len(stack), stack_slices_len_target)
@@ -570,8 +554,6 @@ async def modified_dfs(
             stack = stack[current_slice_size:]
 
         assert not stack, 'Stack must be empty after slicing'
-
-        print(f'[DEBUG] Stack slice sizes: {", ".join(str(len(stack_slice)) for stack_slice in stack_slices)}')
 
         tasks.extend(
             asyncio.create_task(
