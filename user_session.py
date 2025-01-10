@@ -1,15 +1,21 @@
+from json import JSONDecodeError
+
 from cachetools import TTLCache
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.websockets import WebSocket
+from httpx import HTTPStatusError
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from utils import get_http_client
+from openstreetmap import OpenStreetMap
 
 _user_cache = TTLCache(maxsize=1024, ttl=7200)  # 2 hours
 
 
 @retry(wait=wait_exponential(), stop=stop_after_attempt(3), reraise=True)
-async def fetch_user_details(request: Request = None, websocket: WebSocket = None) -> dict | None:
+async def fetch_user_details(
+    request: Request = None,  # type: ignore
+    websocket: WebSocket = None,  # type: ignore
+) -> dict | None:
     if request is not None:
         cookies = request.cookies
     elif websocket is not None:
@@ -17,29 +23,19 @@ async def fetch_user_details(request: Request = None, websocket: WebSocket = Non
     else:
         raise ValueError('Either request or websocket must be provided')
 
-    try:
-        access_token = cookies['access_token']
-    except KeyError:
+    access_token = cookies.get('access_token')
+    if access_token is None:
         return None
 
-    try:
-        return _user_cache[access_token]
-    except KeyError:
-        pass
+    cached = _user_cache.get(access_token)
+    if cached is not None:
+        return cached
 
-    async with get_http_client(
-        'https://api.openstreetmap.org/api',
-        headers={'Authorization': f'Bearer {access_token}'},
-    ) as http:
-        response = await http.get('/0.6/user/details.json')
-
-    if not response.is_success:
-        return None
-
-    try:
-        user = response.json()['user']
-    except Exception:
-        return None
+    async with OpenStreetMap(access_token=access_token) as osm:
+        try:
+            user = await osm.get_authorized_user()
+        except (HTTPStatusError, JSONDecodeError, KeyError):
+            return None
 
     if 'img' not in user:
         user['img'] = {'href': None}

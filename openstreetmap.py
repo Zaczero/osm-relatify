@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Literal
 
-import httpx
 import xmltodict
 from asyncache import cached
 from cachetools import TTLCache
@@ -20,18 +20,20 @@ class UploadResult:
 
 class OpenStreetMap:
     def __init__(self, *, access_token: str | None = None):
-        self.headers = {'Authorization': f'Bearer {access_token}'} if access_token else {}
+        headers = {'Authorization': f'Bearer {access_token}'} if access_token else None
+        self._http = get_http_client('https://api.openstreetmap.org/api', headers=headers)
 
-    def _get_http_client(self) -> httpx.AsyncClient:
-        return get_http_client('https://api.openstreetmap.org/api', headers=self.headers)
+    async def __aenter__(self) -> 'OpenStreetMap':
+        await self._http.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self._http.__aexit__(exc_type, exc_val, exc_tb)
 
     async def get_changeset_maxsize(self) -> int:
-        async with self._get_http_client() as http:
-            r = await http.get('/capabilities')
-            r.raise_for_status()
-
+        r = await self._http.get('/capabilities')
+        r.raise_for_status()
         caps = xmltodict.parse(r.text)
-
         return int(caps['osm']['api']['changesets']['@maximum_elements'])
 
     async def get_relation(self, relation_id: str | int, *, json: bool = True) -> dict:
@@ -53,24 +55,26 @@ class OpenStreetMap:
         return await self._get_elements('nodes', node_ids, json=json)
 
     @cached(TTLCache(maxsize=1024, ttl=60))
-    async def _get_elements(self, elements_type: str, element_ids: Iterable[str | int], json: bool) -> list[dict]:
-        async with self._get_http_client() as http:
-            r = await http.get(
-                f'/0.6/{elements_type}{".json" if json else ""}',
-                params={elements_type: ','.join(map(str, element_ids))},
-            )
-            r.raise_for_status()
-
+    async def _get_elements(
+        self,
+        elements_type: Literal['nodes', 'ways', 'relations'],
+        element_ids: Iterable[str | int],
+        json: bool,
+    ) -> list[dict]:
+        r = await self._http.get(
+            f'/0.6/{elements_type}{".json" if json else ""}',
+            params={elements_type: ','.join(map(str, element_ids))},
+        )
+        r.raise_for_status()
         if json:
             return r.json()['elements']
         else:
             return ensure_list(xmltodict.parse(r.text)['osm'][elements_type[:-1]])
 
     async def get_authorized_user(self) -> dict:
-        async with self._get_http_client() as http:
-            r = await http.get('/0.6/user/details.json')
-            r.raise_for_status()
-            return r.json()['user']
+        r = await self._http.get('/0.6/user/details.json')
+        r.raise_for_status()
+        return r.json()['user']
 
     async def upload_osm_change(self, osm_change: str, tags: dict[str, str]) -> UploadResult:
         assert 'comment' in tags, 'You must provide a comment'
@@ -91,45 +95,29 @@ class OpenStreetMap:
                 print(f'🚧 Warning: Trimming {key} value because it exceeds {TAG_MAX_LENGTH} characters: {value}')
                 tags[key] = value[: TAG_MAX_LENGTH - 1] + '…'
 
-        changeset_dict = {
-            'osm': {
-                'changeset': {
-                    'tag': [
-                        {
-                            '@k': k,
-                            '@v': v,
-                        }
-                        for k, v in tags.items()
-                    ]
-                }
-            }
-        }
-
+        changeset_dict = {'osm': {'changeset': {'tag': [{'@k': k, '@v': v} for k, v in tags.items()]}}}
         changeset = xmltodict.unparse(changeset_dict)
 
-        async with self._get_http_client() as http:
-            r = await http.put(
-                '/0.6/changeset/create',
-                content=changeset,
-                headers={'Content-Type': 'text/xml; charset=utf-8'},
-                follow_redirects=False,
-            )
-            r.raise_for_status()
+        r = await self._http.put(
+            '/0.6/changeset/create',
+            content=changeset,
+            headers={'Content-Type': 'text/xml; charset=utf-8'},
+            follow_redirects=False,
+        )
+        r.raise_for_status()
+        changeset_id_raw = r.text
+        changeset_id = int(changeset_id_raw)
 
-            changeset_id_raw = r.text
-            changeset_id = int(changeset_id_raw)
+        osm_change = osm_change.replace(CHANGESET_ID_PLACEHOLDER, changeset_id_raw)
+        upload_resp = await self._http.post(
+            f'/0.6/changeset/{changeset_id_raw}/upload',
+            content=osm_change,
+            headers={'Content-Type': 'text/xml; charset=utf-8'},
+            timeout=150,
+        )
 
-            osm_change = osm_change.replace(CHANGESET_ID_PLACEHOLDER, changeset_id_raw)
-
-            upload_resp = await http.post(
-                f'/0.6/changeset/{changeset_id_raw}/upload',
-                content=osm_change,
-                headers={'Content-Type': 'text/xml; charset=utf-8'},
-                timeout=150,
-            )
-
-            r = await http.put(f'/0.6/changeset/{changeset_id_raw}/close')
-            r.raise_for_status()
+        r = await self._http.put(f'/0.6/changeset/{changeset_id_raw}/close')
+        r.raise_for_status()
 
         if not upload_resp.is_success:
             return UploadResult(

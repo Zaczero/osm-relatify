@@ -1,6 +1,7 @@
 import asyncio
 import os
 from concurrent.futures import ProcessPoolExecutor
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from itertools import chain
 from typing import Annotated
@@ -46,29 +47,36 @@ from overpass import Overpass
 from relation_builder import build_osm_change, get_relation_members, sort_and_upgrade_members
 from route_warnings import check_for_issues
 from user_session import fetch_user_details, require_user_access_token, require_user_details
-from utils import get_http_client, print_run_time
+from utils import HTTP, print_run_time
 
-_json_decode = Decoder().decode
-_json_encode = Encoder(decimal_format='number').encode
+_JSON_DECODE = Decoder().decode
+_JSON_ENCODE = Encoder(decimal_format='number').encode
 
-app = FastAPI()
+_SESSION_MAX_AGE = 31536000  # 1 year
+_TEMPLATES = Jinja2Templates(directory='templates', auto_reload=TEST_ENV)
+
+_PROCESS_EXECUTOR = ProcessPoolExecutor(CALC_ROUTE_MAX_PROCESSES)
+_OSM = OpenStreetMap()
+_OVERPASS = Overpass()
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    async with _OSM:
+        yield
+
+
+app = FastAPI(lifespan=lifespan, openapi_url=None, docs_url=None, redoc_url=None)
 app.router.route_class = DeflateRoute
 app.mount('/static', StaticFiles(directory='static', html=True), name='static')
-
-cookie_max_age = 31536000  # 1 year
-templates = Jinja2Templates(directory='templates', auto_reload=TEST_ENV)
-
-process_executor = ProcessPoolExecutor(CALC_ROUTE_MAX_PROCESSES)
-openstreetmap = OpenStreetMap()
-overpass = Overpass()
 
 
 @app.get('/')
 async def index(request: Request, user=Depends(fetch_user_details)):
     if user is not None:
-        return templates.TemplateResponse('authorized.jinja2', {'request': request, 'user': user})
+        return _TEMPLATES.TemplateResponse('authorized.jinja2', {'request': request, 'user': user})
     else:
-        return templates.TemplateResponse('index.jinja2', {'request': request})
+        return _TEMPLATES.TemplateResponse('index.jinja2', {'request': request})
 
 
 @app.post('/login')
@@ -93,23 +101,20 @@ async def callback(request: Request, code: Annotated[str, Query()], state: Annot
     cookie_state = request.cookies.get('oauth_state')
     if cookie_state != state:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Invalid OAuth state')
-
-    async with get_http_client() as http:
-        r = await http.post(
-            'https://www.openstreetmap.org/oauth2/token',
-            data={
-                'client_id': OSM_CLIENT,
-                'client_secret': OSM_SECRET,
-                'redirect_uri': str(request.url_for('callback')),
-                'grant_type': 'authorization_code',
-                'code': code,
-            },
-        )
-        r.raise_for_status()
-        access_token = r.json()['access_token']
-
+    r = await HTTP.post(
+        'https://www.openstreetmap.org/oauth2/token',
+        data={
+            'client_id': OSM_CLIENT,
+            'client_secret': OSM_SECRET,
+            'redirect_uri': str(request.url_for('callback')),
+            'grant_type': 'authorization_code',
+            'code': code,
+        },
+    )
+    r.raise_for_status()
+    access_token = r.json()['access_token']
     response = RedirectResponse('/', status.HTTP_302_FOUND)
-    response.set_cookie('access_token', access_token, cookie_max_age, secure=not TEST_ENV, httponly=True)
+    response.set_cookie('access_token', access_token, _SESSION_MAX_AGE, secure=not TEST_ENV, httponly=True)
     return response
 
 
@@ -123,17 +128,12 @@ def logout():
 def get_route_type(tags: dict[str, str]) -> str | None:
     if tags.get('public_transport:version') != '2':
         return None
-
     type = tags.get('type')
-
-    if type not in ('route', 'disused:route', 'was:route'):
+    if type not in {'route', 'disused:route', 'was:route'}:
         return None
-
     type_specifier = tags.get(type)
-
-    if type_specifier not in ('bus', 'tram'):
+    if type_specifier not in {'bus', 'tram'}:
         return None
-
     return type_specifier
 
 
@@ -165,7 +165,7 @@ async def post_query(model: PostQueryModel, _=Depends(require_user_details)):
 
     with print_run_time('Querying relation data'):
         try:
-            relation = await openstreetmap.get_relation(model.relationId)
+            relation = await _OSM.get_relation(model.relationId)
         except HTTPStatusError as e:
             if e.response.status_code == status.HTTP_404_NOT_FOUND:
                 raise HTTPException(status.HTTP_404_NOT_FOUND, 'Relation not found') from e
@@ -176,7 +176,7 @@ async def post_query(model: PostQueryModel, _=Depends(require_user_details)):
         if route_type is None:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Relation must be a PTv2 bus/tram route')
 
-        bounds, download_hist, download_triggers, ways, id_map, bus_stop_collections = await overpass.query_relation(
+        bounds, download_hist, download_triggers, ways, id_map, bus_stop_collections = await _OVERPASS.query_relation(
             relation_id=model.relationId,
             download_hist=download_hist,
             download_targets=download_targets,
@@ -223,7 +223,7 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
 
             with start_span(op='websocket.function', description='calc_bus_route'):
                 body = deflate_decompress(body)
-                json: dict = _json_decode(body)
+                json: dict = _JSON_DECODE(body)
                 model = from_dict(
                     PostCalcBusRouteModel,
                     json,
@@ -249,7 +249,7 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
 
                 try:
                     async with asyncio.TaskGroup() as tg:
-                        get_task = tg.create_task(openstreetmap.get_relation(model.relationId))
+                        get_task = tg.create_task(_OSM.get_relation(model.relationId))
                         route_task = tg.create_task(
                             asyncio.wait_for(
                                 calc_bus_route(
@@ -258,7 +258,7 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
                                     model.stopWay,
                                     model.busStops,
                                     model.tags,
-                                    process_executor,
+                                    _PROCESS_EXECUTOR,
                                     n_processes=CALC_ROUTE_N_PROCESSES,
                                 ),
                                 timeout=3,
@@ -284,7 +284,7 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
                     relation_members=relation_members,
                 )
 
-                body = _json_encode(final_route)
+                body = _JSON_ENCODE(final_route)
                 body = deflate_compress(body)
                 await ws.send_bytes(body)
 
@@ -333,8 +333,8 @@ async def post_download_osm_change(model: PostDownloadOsmChangeModel, _=Depends(
             model.relationId,
             route,
             include_changeset_id=False,
-            overpass=overpass,
-            osm=openstreetmap,
+            overpass=_OVERPASS,
+            osm=_OSM,
         )
 
     return Response(content=osm_change, media_type='text/xml; charset=utf-8')
@@ -355,23 +355,22 @@ async def post_upload_osm(model: PostDownloadOsmChangeModel, access_token: str =
             model.relationId,
             route,
             include_changeset_id=True,
-            overpass=overpass,
-            osm=openstreetmap,
+            overpass=_OVERPASS,
+            osm=_OSM,
         )
 
-    openstreetmap_auth = OpenStreetMap(access_token=access_token)
-    openstreetmap_user = await openstreetmap_auth.get_authorized_user()
-    user_edits = openstreetmap_user['changesets']['count']
-
-    upload_result = await openstreetmap_auth.upload_osm_change(
-        osm_change,
-        {
-            'changesets_count': user_edits + 1,
-            'comment': model.make_comment(),
-            'created_by': CREATED_BY,
-            'host': WEBSITE,
-        },
-    )
+    async with OpenStreetMap(access_token=access_token) as osm:
+        osm_user = await osm.get_authorized_user()
+        user_edits = osm_user['changesets']['count']
+        upload_result = await osm.upload_osm_change(
+            osm_change,
+            {
+                'changesets_count': user_edits + 1,
+                'comment': model.make_comment(),
+                'created_by': CREATED_BY,
+                'host': WEBSITE,
+            },
+        )
 
     if upload_result.ok:
         print(f'✅ Changeset upload success: #{upload_result.changeset_id}')

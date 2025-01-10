@@ -1,10 +1,9 @@
-from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections import Counter, defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import replace
 from itertools import chain
 from typing import NamedTuple
 
-import httpx
 import xmltodict
 from asyncache import cached
 from cachetools import TTLCache
@@ -18,7 +17,7 @@ from models.bounding_box_collection import BoundingBoxCollection
 from models.download_history import Cell, DownloadHistory
 from models.element_id import ElementId, element_id
 from models.fetch_relation import FetchRelationBusStop, FetchRelationBusStopCollection, FetchRelationElement
-from utils import get_http_client
+from utils import HTTP
 from xmltodict_postprocessor import postprocessor
 
 # TODO: right hand side detection by querying roundabouts, and first/last bus stop
@@ -126,6 +125,8 @@ def build_query(
             'out count;'
         )
 
+    raise NotImplementedError(f'Unsupported route type {route_type!r}')
+
 
 def build_parents_query(way_ids: Iterable[int], timeout: int) -> str:
     def _parents(way_id: int) -> str:
@@ -202,6 +203,8 @@ def is_routable(tags: dict[str, str], route_type: str) -> bool:
         # all overpass-fetched elements are routable
         return True
 
+    raise NotImplementedError(f'Unsupported route type {route_type!r}')
+
 
 def is_oneway(tags: dict[str, str]) -> bool:
     # TODO: it would be nice to support oneway=-1
@@ -248,7 +251,11 @@ def is_tram_element(tags: dict[str, str]) -> bool:
 
 
 def _merge_relation_tags(element: dict, relation: dict, extra: dict) -> None:
-    element['tags'] = relation.get('tags', {}) | element.get('tags', {}) | extra
+    element['tags'] = {
+        **relation.get('tags', {}),
+        **element.get('tags', {}),
+        **extra,
+    }
 
 
 def merge_relations_tags(relations: Iterable[dict], elements: Iterable[dict], role: str, public_transport: str) -> None:
@@ -265,17 +272,14 @@ def merge_relations_tags(relations: Iterable[dict], elements: Iterable[dict], ro
             _merge_relation_tags(platform, relation, {'public_transport': public_transport})
 
 
-def _create_node_counts(ways: list[dict]) -> dict[int, int]:
-    node_counts = defaultdict(int)
-
+def _create_node_counts(ways: list[dict]) -> Counter[int]:
+    node_counts: Counter[int] = Counter()
     for way in ways:
-        for node in way['nodes']:
-            node_counts[node] += 1
-
+        node_counts.update(way['nodes'])
     return node_counts
 
 
-def _split_way_on_intersection(way: dict, node_counts: dict[int, int]) -> list[list[int]]:
+def _split_way_on_intersection(way: dict, node_counts: Mapping[int, int]) -> list[list[int]]:
     segments: list[list[int]] = []
     current_segment: list[int] = []
 
@@ -326,16 +330,14 @@ def organize_ways(ways: list[dict]) -> tuple[list[dict], dict[ElementId, set[Ele
     return split_ways, connected_ways_map, id_map
 
 
-def preprocess_elements(elements: Iterable[dict]) -> Sequence[dict]:
-    # deduplicate
-    map = {(e['type'], e['id']): e for e in elements}
-    result = tuple(map.values())
-
+def preprocess_elements(elements: Iterable[dict]) -> tuple[dict, ...]:
+    # deduplicate by type/id
+    result: tuple[dict, ...] = tuple({(e['type'], e['id']): e for e in elements}.values())
     # extract center
     for e in result:
-        if 'center' in e:
-            e |= e['center']
-
+        center: dict | None = e.get('center')
+        if center is not None:
+            e.update(center)
     return result
 
 
@@ -423,20 +425,15 @@ class Overpass:
     def __init__(self):
         pass
 
-    def _get_http_client(self) -> httpx.AsyncClient:
-        return get_http_client(OVERPASS_API_INTERPRETER)
-
     @cached(TTLCache(maxsize=1024, ttl=7200))  # 2 hours
     async def _query_relation_history_post(
         self,
         session: str,  # cache busting  # noqa: ARG002
         query: str,
-        timeout: float,
+        http_timeout: float,
     ) -> list[list[dict]]:
-        async with self._get_http_client() as http:
-            r = await http.post('', data={'data': query}, timeout=timeout * 2)
-            r.raise_for_status()
-
+        r = await HTTP.post(OVERPASS_API_INTERPRETER, data={'data': query}, timeout=http_timeout * 2)
+        r.raise_for_status()
         elements: list[dict] = r.json()['elements']
         return split_by_count(elements)
 
@@ -495,10 +492,8 @@ class Overpass:
         if download_targets is None:
             timeout = 60
             query = build_bb_query(relation_id, timeout)
-
-            async with self._get_http_client() as http:
-                r = await http.post('', data={'data': query}, timeout=timeout * 2)
-                r.raise_for_status()
+            r = await HTTP.post(OVERPASS_API_INTERPRETER, data={'data': query}, timeout=timeout * 2)
+            r.raise_for_status()
 
             elements: list[dict] = r.json()['elements']
             if not elements:
@@ -601,10 +596,8 @@ class Overpass:
     async def query_parents(self, way_ids_set: frozenset[int]) -> QueryParentsResult:
         timeout = 60
         query = build_parents_query(way_ids_set, timeout)
-
-        async with self._get_http_client() as http:
-            r = await http.post('', data={'data': query}, timeout=timeout * 2)
-            r.raise_for_status()
+        r = await HTTP.post(OVERPASS_API_INTERPRETER, data={'data': query}, timeout=timeout * 2)
+        r.raise_for_status()
 
         data: dict[str, list[dict]] = xmltodict.parse(
             r.text,
