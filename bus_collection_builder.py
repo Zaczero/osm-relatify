@@ -1,6 +1,6 @@
 from collections import defaultdict
-from collections.abc import Generator, Sequence
-from itertools import combinations, repeat
+from collections.abc import Sequence
+from itertools import combinations
 from math import radians
 from operator import itemgetter
 
@@ -9,6 +9,7 @@ import numpy as np
 from rapidfuzz.fuzz import token_ratio
 from rapidfuzz.process import extract
 from scipy.optimize import linear_sum_assignment
+from sentry_sdk import trace
 from sklearn.neighbors import BallTree
 
 from config import BUS_COLLECTION_SEARCH_AREA
@@ -17,69 +18,12 @@ from models.fetch_relation import FetchRelationBusStop, FetchRelationBusStopColl
 from utils import extract_numbers
 
 
-def _pick_best(
-    elements: list[FetchRelationBusStop],
-) -> tuple[Sequence[FetchRelationBusStop], Sequence[FetchRelationBusStop]]:
-    if not elements:
-        return (), ()
-
-    elements_explicit = tuple(e for e in elements if e.highway == 'bus_stop')
-    elements_implicit = tuple(e for e in elements if e.highway != 'bus_stop')
-
-    return elements_explicit, elements_implicit
-
-
-def _assign(
-    primary: Sequence[FetchRelationBusStop], elements: Sequence[FetchRelationBusStop], *, element_reuse: bool
-) -> Generator[FetchRelationBusStop | None, None, None]:
-    if len(elements) >= 2:
-        # find the closest stop to each platform
-        if len(elements) < len(primary):
-            # disallow reuse of elements
-            if not element_reuse:
-                return repeat(None, len(primary))
-
-            tree = BallTree(tuple(radians_tuple(e.latLng) for e in elements), metric='haversine')
-            query_indices = tree.query(
-                tuple(radians_tuple(p.latLng) for p in primary), k=1, return_distance=False, sort_results=False
-            )
-
-            return (elements[i] for i in query_indices[:, 0])
-
-        # minimize the total distance between each platform and stop
-        else:
-            distance_matrix = np.zeros((len(primary), len(elements)))
-
-            # compute the haversine distance between each platform and stop
-            for i, p in enumerate(primary):
-                for j, e in enumerate(elements):
-                    distance_matrix[i, j] = haversine_distance(p.latLng, e.latLng)
-
-            # use the Hungarian algorithm to find the optimal assignment
-            row_ind, col_ind = linear_sum_assignment(distance_matrix)
-
-            # ensure the assignments are sorted by platform indices
-            assignments = sorted(zip(row_ind, col_ind))
-
-            # get the assigned stop for each platform
-            return (elements[j] for _, j in assignments)
-
-    elif len(elements) == 1:
-        # disallow reuse of elements
-        if not element_reuse and len(primary) > 1:
-            return repeat(None, len(primary))
-
-        return repeat(elements[0], len(primary))
-    else:
-        return repeat(None, len(primary))
-
-
-def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[FetchRelationBusStopCollection]:
+@trace
+def build_bus_stop_collections(bus_stops: Sequence[FetchRelationBusStop]) -> list[FetchRelationBusStopCollection]:
     # 1. group by area
     # 2. group by name in area
     # 3. discard unnamed if in area with named
     # 4. for each named group, pick best platform and best stop
-
     if not bus_stops:
         return []
 
@@ -89,10 +33,13 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
     bus_stops_coordinates = tuple(radians_tuple(bus_stop.latLng) for bus_stop in bus_stops)
     bus_stops_tree = BallTree(bus_stops_coordinates, metric='haversine')
 
-    G = nx.Graph()
+    G = nx.Graph()  # noqa: N806
 
     query_indices, _ = bus_stops_tree.query_radius(
-        bus_stops_coordinates, r=search_latLng_rad, return_distance=True, sort_results=True
+        bus_stops_coordinates,
+        r=search_latLng_rad,
+        return_distance=True,
+        sort_results=True,
     )
 
     # group by area
@@ -130,9 +77,10 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
             }
 
             expand_data = sorted(
-                expand_data.items(), key=lambda t: (sum(map(itemgetter(1), t[1])), -len(t[0])), reverse=True
+                expand_data.items(),
+                key=lambda t: (sum(map(itemgetter(1), t[1])), -len(t[0])),
+                reverse=True,
             )
-
             # pprint(expand_data)
 
             for expand_key, target_data in expand_data:
@@ -201,33 +149,91 @@ def build_bus_stop_collections(bus_stops: list[FetchRelationBusStop]) -> list[Fe
                 )
 
             if platforms_explicit:
-                for platform, stop in zip(platforms_explicit, _assign(platforms_explicit, stops, element_reuse=True)):
+                for platform, stop in zip(
+                    platforms_explicit, _assign(platforms_explicit, stops, allow_element_reuse=True)
+                ):
                     collections.append(FetchRelationBusStopCollection(platform=platform, stop=stop))
-
                 continue
 
             if stops_explicit:
-                for stop, platform in zip(stops_explicit, _assign(stops_explicit, platforms, element_reuse=False)):
+                for stop, platform in zip(
+                    stops_explicit, _assign(stops_explicit, platforms, allow_element_reuse=False)
+                ):
                     collections.append(FetchRelationBusStopCollection(platform=platform, stop=stop))
-
                 continue
 
             if platforms_implicit and stops_implicit:
-                for platform, stop in zip(platforms_implicit, _assign(platforms_implicit, stops, element_reuse=True)):
+                for platform, stop in zip(
+                    platforms_implicit, _assign(platforms_implicit, stops, allow_element_reuse=True)
+                ):
                     collections.append(FetchRelationBusStopCollection(platform=platform, stop=stop))
-
                 continue
 
             if platforms_implicit:  # and not stops_implicit
-                for platform in platforms_implicit:
-                    collections.append(FetchRelationBusStopCollection(platform=platform, stop=None))
-
+                collections.extend(
+                    FetchRelationBusStopCollection(platform=platform, stop=None) for platform in platforms_implicit
+                )
                 continue
 
             if stops_implicit:  # and not platforms_implicit
-                for stop in stops_implicit:
-                    collections.append(FetchRelationBusStopCollection(platform=None, stop=stop))
-
+                collections.extend(FetchRelationBusStopCollection(platform=None, stop=stop) for stop in stops_implicit)
                 continue
 
     return collections
+
+
+def _pick_best(
+    elements: list[FetchRelationBusStop],
+) -> tuple[tuple[FetchRelationBusStop, ...], tuple[FetchRelationBusStop, ...]]:
+    if not elements:
+        return (), ()
+    elements_explicit = tuple(e for e in elements if e.highway == 'bus_stop')
+    elements_implicit = tuple(e for e in elements if e.highway != 'bus_stop')
+    return elements_explicit, elements_implicit
+
+
+@trace
+def _assign(
+    primary: Sequence[FetchRelationBusStop],
+    elements: Sequence[FetchRelationBusStop],
+    *,
+    allow_element_reuse: bool,
+) -> list[FetchRelationBusStop] | list[None]:
+    if len(elements) >= 2:
+        # find the closest stop to each platform
+        if len(elements) < len(primary):
+            # disallow reuse of elements
+            if not allow_element_reuse:
+                return [None] * len(primary)
+
+            tree = BallTree(tuple(radians_tuple(e.latLng) for e in elements), metric='haversine')
+            query_indices = tree.query(
+                tuple(radians_tuple(p.latLng) for p in primary),
+                k=1,
+                return_distance=False,
+                sort_results=False,
+            )
+            return [elements[i] for i in query_indices[:, 0]]
+
+        # minimize the total distance between each platform and stop
+        else:
+            distance_matrix = np.zeros((len(primary), len(elements)))
+            # compute the haversine distance between each platform and stop
+            for i, p in enumerate(primary):
+                for j, e in enumerate(elements):
+                    distance_matrix[i, j] = haversine_distance(p.latLng, e.latLng)
+            # use the Hungarian algorithm to find the optimal assignment
+            row_ind, col_ind = linear_sum_assignment(distance_matrix)
+            # ensure the assignments are sorted by platform indices
+            assignments = sorted(zip(row_ind, col_ind, strict=False))
+            # get the assigned stop for each platform
+            return [elements[j] for _, j in assignments]
+
+    elif len(elements) == 1:
+        # disallow reuse of elements
+        if not allow_element_reuse and len(primary) > 1:
+            return [None] * len(primary)
+
+        return [elements[0]] * len(primary)
+    else:
+        return [None] * len(primary)

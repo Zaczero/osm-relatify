@@ -9,8 +9,8 @@ dependencies = [
   "gunicorn",
   "httpx[brotli,zstd]",
   "jinja2",
-  "msgspec",
   "networkx",
+  "orjson>=3.10.14",
   "rapidfuzz",
   "rtree",
   "scikit-learn",
@@ -64,7 +64,7 @@ line-length = 120
 target-version = "py313"
 
 [tool.ruff.lint]
-ignore = ["B008", "S101"]
+ignore = ["B008", "B905", "S101"]
 # see https://docs.astral.sh/ruff/rules/ for rules documentation
 select = [
   "A",     # flake8-builtins

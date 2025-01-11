@@ -7,15 +7,15 @@ from itertools import chain
 from typing import Annotated
 from urllib.parse import urlencode
 
+import orjson
 from dacite import Config, from_dict
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import ORJSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx import HTTPStatusError
-from msgspec.json import Decoder, Encoder
 from pydantic import BaseModel
-from sentry_sdk import start_span
+from sentry_sdk import start_transaction
 from starlette.websockets import WebSocketState
 
 from compression import deflate_compress, deflate_decompress
@@ -49,9 +49,6 @@ from route_warnings import check_for_issues
 from user_session import fetch_user_details, require_user_access_token, require_user_details
 from utils import HTTP, print_run_time
 
-_JSON_DECODE = Decoder().decode
-_JSON_ENCODE = Encoder(decimal_format='number').encode
-
 _SESSION_MAX_AGE = 31536000  # 1 year
 _TEMPLATES = Jinja2Templates(directory='templates', auto_reload=TEST_ENV)
 
@@ -66,7 +63,13 @@ async def lifespan(_: FastAPI):
         yield
 
 
-app = FastAPI(lifespan=lifespan, openapi_url=None, docs_url=None, redoc_url=None)
+app = FastAPI(
+    lifespan=lifespan,
+    default_response_class=ORJSONResponse,
+    openapi_url=None,
+    docs_url=None,
+    redoc_url=None,
+)
 app.router.route_class = DeflateRoute
 app.mount('/static', StaticFiles(directory='static', html=True), name='static')
 
@@ -219,14 +222,12 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
 
     try:
         while True:
-            body = await ws.receive_bytes()
+            request = await ws.receive_bytes()
 
-            with start_span(op='websocket.function', description='calc_bus_route'):
-                body = deflate_decompress(body)
-                json: dict = _JSON_DECODE(body)
+            with start_transaction(op='websocket.server', name='/ws/calc_bus_route'):
                 model = from_dict(
                     PostCalcBusRouteModel,
-                    json,
+                    orjson.loads(deflate_decompress(request)),
                     Config(cast=[ElementId, tuple, PublicTransport], strict=True),
                 )
 
@@ -284,9 +285,8 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
                     relation_members=relation_members,
                 )
 
-                body = _JSON_ENCODE(final_route)
-                body = deflate_compress(body)
-                await ws.send_bytes(body)
+                response = deflate_compress(orjson.dumps(final_route, option=orjson.OPT_STRICT_INTEGER))
+                await ws.send_bytes(response)
 
     except WebSocketDisconnect:
         pass
