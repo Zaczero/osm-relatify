@@ -135,6 +135,8 @@ def get_route_type(tags: dict[str, str]) -> str | None:
     if type not in {'route', 'disused:route', 'was:route'}:
         return None
     type_specifier = tags.get(type)
+    if type_specifier == 'trolleybus':
+        return 'bus'
     if type_specifier not in {'bus', 'tram'}:
         return None
     return type_specifier
@@ -241,12 +243,12 @@ async def post_calc_bus_route(ws: WebSocket, _=Depends(require_user_details)):
 
                 assert ways_members, 'No ways are members of the relation'
 
-                assert all(
-                    collection.platform.member for collection in model.busStops if collection.platform
-                ), 'All bus platforms must be members of the relation'
-                assert all(
-                    collection.stop.member for collection in model.busStops if collection.stop
-                ), 'All bus stops must be members of the relation'
+                assert all(collection.platform.member for collection in model.busStops if collection.platform), (
+                    'All bus platforms must be members of the relation'
+                )
+                assert all(collection.stop.member for collection in model.busStops if collection.stop), (
+                    'All bus stops must be members of the relation'
+                )
 
                 try:
                     async with asyncio.TaskGroup() as tg:

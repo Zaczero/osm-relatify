@@ -231,7 +231,7 @@ def is_roundabout(tags: dict[str, str]) -> bool:
 
 
 def is_bus_explicit(tags: dict[str, str]) -> bool:
-    return tags.get('bus') == 'yes'
+    return tags.get('bus') == 'yes' or tags.get('trolleybus') == 'yes'
 
 
 def is_any_rail_related(tags: dict[str, str]) -> bool:
