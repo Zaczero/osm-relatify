@@ -10,7 +10,7 @@ dependencies = [
   "httpx[brotli,zstd]",
   "jinja2",
   "networkx",
-  "orjson>=3.10.14",
+  "orjson",
   "rapidfuzz",
   "rtree",
   "scikit-learn",
@@ -30,35 +30,8 @@ package = false
 python-downloads = "never"
 python-preference = "only-system"
 
-[tool.setuptools]
-packages = ["."]
-
 [tool.ruff]
-# Exclude a variety of commonly ignored directories.
-exclude = [
-  ".bzr",
-  ".direnv",
-  ".eggs",
-  ".git",
-  ".git-rewrite",
-  ".hg",
-  ".mypy_cache",
-  ".nox",
-  ".pants.d",
-  ".pytype",
-  ".ruff_cache",
-  ".svn",
-  ".tox",
-  ".venv",
-  "__pypackages__",
-  "_build",
-  "buck-out",
-  "build",
-  "dist",
-  "node_modules",
-  "venv",
-]
-
+exclude = [".git"]
 indent-width = 4
 line-length = 120
 target-version = "py313"
