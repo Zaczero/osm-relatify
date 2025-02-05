@@ -26,6 +26,7 @@ requires-python = "~=3.13"
 version = "0.0.0"
 
 [tool.uv]
+compile-bytecode = true
 package = false
 python-downloads = "never"
 python-preference = "only-system"
