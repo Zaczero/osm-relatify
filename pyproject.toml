@@ -32,7 +32,6 @@ python-downloads = "never"
 python-preference = "only-system"
 
 [tool.ruff]
-exclude = [".git"]
 indent-width = 4
 line-length = 120
 target-version = "py313"
