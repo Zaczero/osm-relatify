@@ -193,11 +193,11 @@ wheels = [
 
 [[package]]
 name = "githead"
-version = "1.2.0"
+version = "1.2.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/85/8d/b3508c37806f60afc9bc7b438f262789b57d38ed2d0c11a8503f44f7c576/githead-1.2.0.tar.gz", hash = "sha256:0e1ee3585ce57d02f60ed6ebbaa22282baae5c9e2149ad215666cb5994e58480", size = 4293 }
+sdist = { url = "https://files.pythonhosted.org/packages/3a/3b/5df3392d08f853027e0a3624756b87524f7afd253bf0bde14d0d316e1749/githead-1.2.2.tar.gz", hash = "sha256:dbf3a6d906c1abc7403200172fb588b1d2472b56e4ce123f279a0db65dac6006", size = 12262 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/a0/de6c61edc5c62795a5822c4fd8b4b6ddd53108aa22aca94d034734fb1aaa/githead-1.2.0-py3-none-any.whl", hash = "sha256:fd3b573bf35571793098d27d9fc3e584b6a300601c99c18c023be4930cc84401", size = 3285 },
+    { url = "https://files.pythonhosted.org/packages/cb/ea/d56feecb053e3ccf19a7ee984cdd55116160a8215de912ead96ce1c0a0b2/githead-1.2.2-py3-none-any.whl", hash = "sha256:04f0fa2d92c6dd15cdae9e8154031dc23ac38077e4e19cc34397b9c3e36b5776", size = 2798 },
 ]
 
 [[package]]
