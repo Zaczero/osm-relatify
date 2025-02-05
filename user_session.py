@@ -8,7 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from openstreetmap import OpenStreetMap
 
-_user_cache = TTLCache(maxsize=1024, ttl=7200)  # 2 hours
+_USER_CACHE = TTLCache(maxsize=1024, ttl=7200)  # 2 hours
 
 
 @retry(wait=wait_exponential(), stop=stop_after_attempt(3), reraise=True)
@@ -27,7 +27,7 @@ async def fetch_user_details(
     if access_token is None:
         return None
 
-    cached = _user_cache.get(access_token)
+    cached = _USER_CACHE.get(access_token)
     if cached is not None:
         return cached
 
@@ -40,7 +40,7 @@ async def fetch_user_details(
     if 'img' not in user:
         user['img'] = {'href': None}
 
-    _user_cache[access_token] = user
+    _USER_CACHE[access_token] = user
     return user
 
 

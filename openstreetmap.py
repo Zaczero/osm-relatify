@@ -20,8 +20,10 @@ class UploadResult:
 
 class OpenStreetMap:
     def __init__(self, *, access_token: str | None = None):
-        headers = {'Authorization': f'Bearer {access_token}'} if access_token else None
-        self._http = get_http_client('https://api.openstreetmap.org/api', headers=headers)
+        self._http = get_http_client(
+            'https://api.openstreetmap.org/api',
+            headers={'Authorization': f'Bearer {access_token}'} if access_token else None,
+        )
 
     async def __aenter__(self) -> 'OpenStreetMap':
         await self._http.__aenter__()
