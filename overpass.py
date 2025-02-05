@@ -394,9 +394,9 @@ def get_download_triggers(
     bbc: BoundingBoxCollection,
     cells: Sequence[Cell],
     ways: dict[ElementId, FetchRelationElement],
-) -> dict[ElementId, Sequence[tuple[int, int]]]:
+) -> dict[ElementId, tuple[Cell, ...]]:
     cells_set = frozenset(cells)
-    result: dict[ElementId, Sequence[Cell]] = {}
+    result = {}
 
     for way_id, way in ways.items():
         way_new_cells = set()
@@ -484,7 +484,7 @@ class Overpass:
     ) -> tuple[
         BoundingBox,
         DownloadHistory,
-        dict[ElementId, Sequence[tuple[int, int]]],
+        dict[ElementId, tuple[Cell, ...]],
         dict[ElementId, FetchRelationElement],
         dict[int, list[ElementId]],
         list[FetchRelationBusStopCollection],
