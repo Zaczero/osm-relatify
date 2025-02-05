@@ -22,6 +22,7 @@ from compression import deflate_compress, deflate_decompress
 from config import (
     CALC_ROUTE_MAX_PROCESSES,
     CALC_ROUTE_N_PROCESSES,
+    CALC_ROUTE_TASKS_PER_PROCESS,
     CREATED_BY,
     OSM_CLIENT,
     OSM_SCOPES,
@@ -52,7 +53,7 @@ from utils import HTTP, print_run_time
 _SESSION_MAX_AGE = 31536000  # 1 year
 _TEMPLATES = Jinja2Templates(directory='templates', auto_reload=TEST_ENV)
 
-_PROCESS_EXECUTOR = ProcessPoolExecutor(CALC_ROUTE_MAX_PROCESSES)
+_PROCESS_EXECUTOR = ProcessPoolExecutor(CALC_ROUTE_MAX_PROCESSES, max_tasks_per_child=CALC_ROUTE_TASKS_PER_PROCESS)
 _OSM = OpenStreetMap()
 _OVERPASS = Overpass()
 
