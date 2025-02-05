@@ -53,10 +53,7 @@ if SENTRY_DSN := os.getenv('SENTRY_DSN'):
         dsn=SENTRY_DSN,
         release=VERSION,
         enable_tracing=True,
-        traces_sample_rate=0.25,
+        traces_sample_rate=0.3,
         trace_propagation_targets=None,
-        profiles_sample_rate=0.25,
-        _experiments={
-            'continuous_profiling_auto_start': True,
-        },
+        profiles_sample_rate=0.2,
     )
