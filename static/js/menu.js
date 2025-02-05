@@ -50,7 +50,7 @@ loadRelationForm.addEventListener("submit", (e) => {
 
     if (loadRelationBtn.classList.contains("is-loading")) return
 
-    relationId = parseInt(relationIdInput.value)
+    relationId = Number.parseInt(relationIdInput.value)
     relationIdInput.disabled = true
     loadRelationBtn.classList.add("btn-secondary")
     loadRelationBtn.classList.add("is-loading")
@@ -367,9 +367,7 @@ submitUploadBtn.onclick = async () => {
             showMessage(
                 "success",
                 "✅ Upload successful",
-                `The changeset <a href="https://www.openstreetmap.org/changeset/${data.changeset_id}" target="_blank">${data.changeset_id}</a> has been uploaded.<br>` +
-                    `<br>` +
-                    `<i>Something broke? Use <a href="https://revert.monicz.dev/?changesets=${data.changeset_id}" target="_blank">this tool</a> to revert it.</i>`,
+                `The changeset <a href="https://www.openstreetmap.org/changeset/${data.changeset_id}" target="_blank">${data.changeset_id}</a> has been uploaded.<br><br><i>Something broke? Use <a href="https://revert.monicz.dev/?changesets=${data.changeset_id}" target="_blank">this tool</a> to revert it.</i>`,
             )
             unload()
         })

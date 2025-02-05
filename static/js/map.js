@@ -7,7 +7,7 @@ function getInitialMapView() {
 
     if (hashPattern.test(hash)) {
         const [_, zoom, lat, lng] = hash.match(hashPattern)
-        return [parseFloat(lat), parseFloat(lng), parseInt(zoom, 10)]
+        return [Number.parseFloat(lat), Number.parseFloat(lng), Number.parseInt(zoom, 10)]
     }
 
     return [52.232, 21.0068, 6] // default view

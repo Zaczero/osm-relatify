@@ -52,7 +52,7 @@
   border-radius: 3px;
   border: 1px solid #ccc;
 
-  opacity: .85;
+  opacity: 0.85;
 }
 
 #menu:hover {
@@ -104,7 +104,7 @@
 }
 
 .warning-message::before {
-  content: '🛈 ';
+  content: "🛈 ";
 }
 
 .warning-LOW {
@@ -187,11 +187,11 @@
   margin-left: auto;
 }
 
-.route-summary-item .stop-info >:first-child {
+.route-summary-item .stop-info > :first-child {
   margin-left: .4em;
 }
 
-.route-summary-item .stop-info > *{
+.route-summary-item .stop-info > * {
   padding: 0 .1em;
 }
 

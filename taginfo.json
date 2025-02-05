@@ -4,39 +4,29 @@
     "contact_email": "contact.via.website@invalid.localhost",
     "contact_name": "Kamil Monicz (Zaczero)",
     "description": "OpenStreetMap Public Transport Made Easy!",
-    "icon_url": "https://raw.githubusercontent.com/Zaczero/osm-relatify/main/static/img/favicon-192.png",
+    "icon_url": "https://raw.githubusercontent.com/Zaczero/osm-relatify/main/static/img/favicon/256.png",
     "name": "OSM Relatify",
     "project_url": "https://relatify.monicz.dev"
   },
   "tags": [
     {
       "key": "public_transport:version",
-      "object_types": [
-        "relation"
-      ],
+      "object_types": ["relation"],
       "value": "2"
     },
     {
       "key": "public_transport",
-      "object_types": [
-        "node",
-        "relation",
-        "way"
-      ],
+      "object_types": ["node", "relation", "way"],
       "value": "platform"
     },
     {
       "key": "public_transport",
-      "object_types": [
-        "node"
-      ],
+      "object_types": ["node"],
       "value": "stop_position"
     },
     {
       "key": "public_transport",
-      "object_types": [
-        "relation"
-      ],
+      "object_types": ["relation"],
       "value": "stop_area"
     }
   ]
