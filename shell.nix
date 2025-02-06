@@ -35,6 +35,8 @@ let
     (writeShellScriptBin "run" ''
       python -m gunicorn main:app \
         --worker-class uvicorn.workers.UvicornWorker \
+        --max-requests 2000 \
+        --max-requests-jitter 0 \
         --graceful-timeout 5 \
         --keep-alive 300 \
         --access-logfile -
