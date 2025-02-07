@@ -179,7 +179,7 @@ async def post_query(model: PostQueryModel, _=Depends(require_user_details)):
         relation_tags = relation.get('tags', {})
         route_type = get_route_type(relation_tags)
         if route_type is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Relation must be a PTv2 bus/tram route')
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Relation must be a PTv2 bus/tram/trolleybus route')
 
         bounds, download_hist, download_triggers, ways, id_map, bus_stop_collections = await _OVERPASS.query_relation(
             relation_id=model.relationId,
