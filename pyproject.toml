@@ -26,7 +26,6 @@ requires-python = "~=3.13"
 version = "0.0.0"
 
 [tool.uv]
-compile-bytecode = true
 package = false
 python-downloads = "never"
 python-preference = "only-system"
@@ -40,43 +39,43 @@ target-version = "py313"
 ignore = ["B008", "B905", "S101"]
 # see https://docs.astral.sh/ruff/rules/ for rules documentation
 select = [
-  "A",     # flake8-builtins
-  "ARG",   # flake8-unused-arguments
+  "A", # flake8-builtins
+  "ARG", # flake8-unused-arguments
   "ASYNC", # flake8-async
-  "B",     # flake8-bugbear
-  "C4",    # flake8-comprehensions
-  "DTZ",   # flake8-datetimez
-  "E4",    # pycodestyle
+  "B", # flake8-bugbear
+  "C4", # flake8-comprehensions
+  "DTZ", # flake8-datetimez
+  "E4", # pycodestyle
   "E7",
   "E9",
-  "F",     # pyflakes
-  "FA",    # flake8-future-annotations
-  "FLY",   # flynt  # "FURB", # refurb
-  "G",     # flake8-logging-format
-  "I",     # isort
-  "ICN",   # flake8-import-conventions
-  "INT",   # flake8-gettext
-  "ISC",   # flake8-implicit-str-concat
-  "LOG",   # flake8-logging
-  "N",     # pep8-naming
-  "NPY",   # numpy
-  "PERF",  # perflint
-  "PIE",   # flake8-pie
-  "PT",    # flake8-pytest-style
-  "PTH",   # flake8-use-pathlib
-  "PYI",   # flake8-pyi
-  "Q",     # flake8-quotes
-  "RSE",   # flake8-raise
-  "RUF",   # ruff
-  "S",     # flake8-bandit
-  "SIM",   # flake8-simplify
-  "SLF",   # flake8-self
-  "SLOT",  # flake8-slots
-  "T10",   # flake8-debugger
-  "TID",   # flake8-tidy-imports
-  "UP",    # pyupgrade
+  "F", # pyflakes
+  "FA", # flake8-future-annotations
+  "FLY", # flynt  # "FURB", # refurb
+  "G", # flake8-logging-format
+  "I", # isort
+  "ICN", # flake8-import-conventions
+  "INT", # flake8-gettext
+  "ISC", # flake8-implicit-str-concat
+  "LOG", # flake8-logging
+  "N", # pep8-naming
+  "NPY", # numpy
+  "PERF", # perflint
+  "PIE", # flake8-pie
+  "PT", # flake8-pytest-style
+  "PTH", # flake8-use-pathlib
+  "PYI", # flake8-pyi
+  "Q", # flake8-quotes
+  "RSE", # flake8-raise
+  "RUF", # ruff
+  "S", # flake8-bandit
+  "SIM", # flake8-simplify
+  "SLF", # flake8-self
+  "SLOT", # flake8-slots
+  "T10", # flake8-debugger
+  "TID", # flake8-tidy-imports
+  "UP", # pyupgrade
   "W6",
-  "YTT",   # flake8-2020
+  "YTT", # flake8-2020
 ]
 
 fixable = ["ALL"]
