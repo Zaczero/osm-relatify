@@ -14,21 +14,17 @@ paths = (
 )
 
 extra_args: list[str] = [
-    '-g',
-    '-O3',
-    '-flto=auto',
     '-pipe',
+    '-g',
+    '-Ofast',
     # docs: https://gcc.gnu.org/onlinedocs/gcc-14.1.0/gcc.pdf
     '-march=' + os.getenv('CYTHON_MARCH', 'native'),
     '-mtune=' + os.getenv('CYTHON_MTUNE', 'native'),
-    '-fhardened',
-    '-funsafe-math-optimizations',
     '-fno-semantic-interposition',
-    '-fno-plt',
-    '-fvisibility=hidden',
     '-fipa-pta',
-    # https://stackoverflow.com/a/23501290
-    '--param=max-vartrack-size=0',
+    '-fvisibility=hidden',
+    '-flto=auto',
+    '-fno-plt',
     *os.getenv('CYTHON_FLAGS', '').split(),
 ]
 
