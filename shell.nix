@@ -65,10 +65,12 @@ let
   ];
 
   shell' = with pkgs; ''
-    export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
+    export TZ=UTC
+    export NIX_ENFORCE_NO_NATIVE=0
+    export NIX_SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
+    export SSL_CERT_FILE=$NIX_SSL_CERT_FILE
     export PYTHONNOUSERSITE=1
     export PYTHONPATH=""
-    export TZ=UTC
 
     current_python=$(readlink -e .venv/bin/python || echo "")
     current_python=''${current_python%/bin/*}
