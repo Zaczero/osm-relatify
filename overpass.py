@@ -62,6 +62,9 @@ def build_query(
             '>;'
             'out skel qt;'
             'out count;'
+            '(' + ''.join(f'node[highway=turning_circle]({bb});' for bb in cell_bbs) + ');'
+            'out tags qt;'
+            'out count;'
             + ''.join(
                 f'node[highway=bus_stop][public_transport=platform][name]({bb});'
                 f'out tags center qt;'
@@ -97,6 +100,9 @@ def build_query(
             'out count;'
             '>;'
             'out skel qt;'
+            'out count;'
+            '(' + ''.join(f'node[highway=turning_circle]({bb});' for bb in cell_bbs) + ');'
+            'out tags qt;'
             'out count;'
             + ''.join(
                 f'node[railway=tram_stop][public_transport=stop_position][name]({bb});'
@@ -296,7 +302,7 @@ def _split_way_on_intersection(way: dict, node_counts: Mapping[int, int]) -> lis
     return segments
 
 
-def organize_ways(ways: list[dict]) -> tuple[list[dict], dict[ElementId, set[ElementId]], dict[int, list[ElementId]]]:
+def organize_ways(ways: list[dict], turn_in_place_nodes: set[int]) -> tuple[list[dict], dict[ElementId, set[ElementId]], dict[int, list[ElementId]]]:
     node_counts = _create_node_counts(ways)
     node_to_way_map = defaultdict(set)
 
@@ -315,6 +321,8 @@ def organize_ways(ways: list[dict]) -> tuple[list[dict], dict[ElementId, set[Ele
                 **way,
                 'id': element_id(way['id'], extra_num=extra_num, max_num=max_num),
                 'nodes': segment,
+                '_turn_in_place_start': segment[0] in turn_in_place_nodes,
+                '_turn_in_place_end': segment[-1] in turn_in_place_nodes,
             }
 
             split_ways.append(split_way)
@@ -532,12 +540,14 @@ class Overpass:
         maybe_road_elements = preprocess_elements(maybe_road_elements)
         node_elements = elements_split[1]
         node_elements = preprocess_elements(node_elements)
+        turn_in_place_elements = elements_split[2]
+        turn_in_place_elements = preprocess_elements(turn_in_place_elements)
 
-        bus_elements = elements_split[2]
+        bus_elements = elements_split[3]
 
-        stop_area_relations = elements_split[3]
-        stop_area_platform_elements = elements_split[4]
-        stop_area_stop_position_elements = elements_split[5]
+        stop_area_relations = elements_split[4]
+        stop_area_platform_elements = elements_split[5]
+        stop_area_stop_position_elements = elements_split[6]
 
         merge_relations_tags(
             stop_area_relations,
@@ -555,13 +565,14 @@ class Overpass:
         road_elements = tuple(e for e in maybe_road_elements if is_routable(e['tags'], route_type))
 
         nodes_map = {e['id']: e for e in node_elements}
+        turn_in_place_nodes = {e['id'] for e in turn_in_place_elements}
 
         for e in road_elements:
             e['_member'] = e['id'] in relation_way_members
             e['_oneway'] = is_oneway(e['tags'])
             e['_roundabout'] = is_roundabout(e['tags'])
 
-        road_elements, connected_ways_map, id_map = organize_ways(road_elements)
+        road_elements, connected_ways_map, id_map = organize_ways(road_elements, turn_in_place_nodes)
 
         ways = {
             e['id']: FetchRelationElement(
@@ -572,6 +583,8 @@ class Overpass:
                 nodes=e['nodes'],
                 latLngs=[(nodes_map[n_id]['lat'], nodes_map[n_id]['lon']) for n_id in e['nodes']],
                 connectedTo=list(connected_ways_map[e['id']]),
+                turn_in_place_start=e['_turn_in_place_start'],
+                turn_in_place_end=e['_turn_in_place_end'],
             )
             for e in road_elements
         }

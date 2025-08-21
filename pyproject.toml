@@ -22,7 +22,7 @@ dependencies = [
   "xmltodict",
 ]
 name = "osm-relatify"
-requires-python = "~=3.13"
+requires-python = "~=3.13.0"
 version = "0.0.0"
 
 [tool.uv]

@@ -50,6 +50,8 @@ class FetchRelationElement:  # more like FetchRelationWay
     nodes: list[int]
     latLngs: list[tuple[float, float]]
     connectedTo: list[ElementId]
+    turn_in_place_start: bool
+    turn_in_place_end: bool
 
     # automatically calculated
     length: float = None

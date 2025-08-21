@@ -155,8 +155,8 @@ def build_graph(ways: dict[ElementId, FetchRelationElement]) -> dict[GraphKey, G
 
     for way_id, way in ways.items():
 
-        def get_neighbors_at(latlon: tuple[cython.double, cython.double]) -> list[GraphKey]:
-            neighbors: list[GraphKey] = []
+        def find_connections_at(latlon: tuple[float, float]) -> list[GraphKey]:
+            connections: list[GraphKey] = []
             for connected_way_id in way.connectedTo:  # noqa: B023
                 connected_way = ways.get(connected_way_id)
                 if not connected_way:  # skip non-member ways
@@ -164,17 +164,25 @@ def build_graph(ways: dict[ElementId, FetchRelationElement]) -> dict[GraphKey, G
                 connected_start = connected_way.latLngs[0]
                 connected_end = connected_way.latLngs[-1]
                 if latlon == connected_start:
-                    neighbors.append(GraphKey(connected_way_id, BOOL_START))
+                    connections.append(GraphKey(connected_way_id, BOOL_START))
                 elif latlon == connected_end and not connected_way.oneway:
-                    neighbors.append(GraphKey(connected_way_id, BOOL_END))
-                else:  # connected via other endpoint
-                    continue
-            return neighbors
+                    connections.append(GraphKey(connected_way_id, BOOL_END))
+            return connections
 
-        start = way.latLngs[0]
-        end = way.latLngs[-1]
-        convert_graph[GraphKey(way_id, BOOL_START)] = get_neighbors_at(start)
-        convert_graph[GraphKey(way_id, BOOL_END)] = get_neighbors_at(end)
+        # Build neighbors for START
+        start_neighbors = find_connections_at(way.latLngs[0])
+        if way.turn_in_place_start and not way.oneway:
+            # U-turn at START: also connect to ways at END
+            start_neighbors.extend(find_connections_at(way.latLngs[-1]))
+
+        # Build neighbors for END
+        end_neighbors = find_connections_at(way.latLngs[-1])
+        if way.turn_in_place_end:
+            # U-turn at END: also connect to ways at START
+            end_neighbors.extend(find_connections_at(way.latLngs[0]))
+
+        convert_graph[GraphKey(way_id, BOOL_START)] = start_neighbors
+        convert_graph[GraphKey(way_id, BOOL_END)] = end_neighbors
 
     intersection_num: cython.int = -1
     result: dict[GraphKey, GraphValue] = {}
