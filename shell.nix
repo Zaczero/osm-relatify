@@ -1,22 +1,27 @@
-{}:
+{ }:
 
 let
   # Update packages with `nixpkgs-update` command
-  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/596312aae91421d6923f18cecce934a7d3bfd6b8.tar.gz") { };
+  pkgs =
+    import
+      (fetchTarball "https://github.com/NixOS/nixpkgs/archive/e99366c665bdd53b7b500ccdc5226675cfc51f45.tar.gz")
+      { };
 
   stdenv' = pkgs.gcc14Stdenv;
   pythonLibs = with pkgs; [
     zlib.out
     stdenv'.cc.cc.lib
   ];
-  python' = with pkgs; (symlinkJoin {
-    name = "python";
-    paths = [ python313 ];
-    buildInputs = [ makeWrapper ];
-    postBuild = ''
-      wrapProgram "$out/bin/python3.13" --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath pythonLibs}"
-    '';
-  });
+  python' =
+    with pkgs;
+    (symlinkJoin {
+      name = "python";
+      paths = [ python313 ];
+      buildInputs = [ makeWrapper ];
+      postBuild = ''
+        wrapProgram "$out/bin/python3.13" --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath pythonLibs}"
+      '';
+    });
 
   packages' = with pkgs; [
     python'

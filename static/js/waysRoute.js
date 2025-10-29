@@ -37,6 +37,15 @@ export function requestCalcBusRoute() {
         }
     }
 
+    if (startWay && !ways[startWay.id]) {
+        console.warn(`Start way ${startWay.id} not found in ways`, ways)
+        ways[startWay.id] = waysData[startWay.id]
+    }
+    if (stopWay && !ways[stopWay.id]) {
+        console.warn(`Stop way ${stopWay.id} not found in ways`, ways)
+        ways[stopWay.id] = waysData[stopWay.id]
+    }
+
     for (const busStopCollection of busStopData) {
         if (busStopCollection.platform?.member || busStopCollection.stop?.member) {
             busStops.push(busStopCollection)

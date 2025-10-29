@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.2.7/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -28,8 +28,7 @@
         "noUndeclaredVariables": "warn",
         "noUnusedImports": "info",
         "noUnusedPrivateClassMembers": "info",
-        "noUnusedVariables": "info",
-        "useArrayLiterals": "info"
+        "noUnusedVariables": "info"
       },
       "recommended": true,
       "style": {
@@ -52,8 +51,5 @@
         "useAwait": "warn"
       }
     }
-  },
-  "organizeImports": {
-    "enabled": true
   }
 }
