@@ -28,6 +28,176 @@
       "key": "public_transport",
       "object_types": ["relation"],
       "value": "stop_area"
+    },
+    {
+      "key": "type",
+      "value": "route",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "type",
+      "value": "disused:route",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "type",
+      "value": "was:route",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "route",
+      "value": "bus",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "disused:route",
+      "value": "bus",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "was:route",
+      "value": "bus",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "route",
+      "value": "tram",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "disused:route",
+      "value": "tram",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "was:route",
+      "value": "tram",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "route",
+      "value": "trolleybus",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "disused:route",
+      "value": "trolleybus",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "was:route",
+      "value": "trolleybus",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "name",
+      "object_types": ["node", "relation", "way"]
+    },
+    {
+      "key": "ref",
+      "object_types": ["node", "relation", "way"]
+    },
+    {
+      "key": "local_ref",
+      "object_types": ["node", "relation", "way"]
+    },
+    {
+      "key": "roundtrip",
+      "value": "yes",
+      "object_types": ["relation"]
+    },
+    {
+      "key": "bus",
+      "value": "yes",
+      "description": "Used to determine whether the element is related to buses."
+    },
+    {
+      "key": "trolleybus",
+      "value": "yes",
+      "description": "Used to determine whether the element is related to trolleybuses."
+    },
+    {
+      "key": "railway",
+      "description": "Used to determine whether the element is related to rail transport."
+    },
+    {
+      "key": "tram",
+      "value": "yes",
+      "description": "Used to determine whether the element is related to trams."
+    },
+    {
+      "key": "train",
+      "value": "yes",
+      "description": "Used to determine whether the element is related to trains."
+    },
+    {
+      "key": "subway",
+      "value": "yes",
+      "description": "Used to determine whether the element is related to subways."
+    },
+    {
+      "key": "highway",
+      "object_types": ["way"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
+    },
+    {
+      "key": "service",
+      "object_types": ["way"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
+    },
+    {
+      "key": "bus:conditional",
+      "object_types": ["way"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
+    },
+    {
+      "key": "bus",
+      "object_types": ["way"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
+    },
+    {
+      "key": "psv",
+      "object_types": ["way"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
+    },
+    {
+      "key": "motor_vehicle",
+      "object_types": ["way"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
+    },
+    {
+      "key": "access",
+      "object_types": ["way"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
+    },
+    {
+      "key": "area",
+      "object_types": ["way", "area"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
+    },
+    {
+      "key": "junction",
+      "value": "roundabout",
+      "object_types": ["way"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
+    },
+    {
+      "key": "oneway",
+      "value": "yes",
+      "object_types": ["way"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
+    },
+    {
+      "key": "oneway:bus",
+      "value": "yes",
+      "object_types": ["way"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
+    },
+    {
+      "key": "oneway:psv",
+      "value": "yes",
+      "object_types": ["way"],
+      "description": "Used to determine whether the way is routable for buses/trolleybuses."
     }
   ]
 }
