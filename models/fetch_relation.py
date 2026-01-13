@@ -92,6 +92,15 @@ class FetchRelationBusStop:
         name: str = data['tags'].get('name', '').strip()
         local_ref: str = data['tags'].get('local_ref', '').strip()
         ref: str = data['tags'].get('ref', '').strip()
+        ref_exts = {k: v for k, v in data['tags'].items() if k.startswith('ref:')}
+        if ref_exts:
+            ref_parts = [r.strip() for r in ref.split(';')] if ref else []
+            for k in sorted(ref_exts):
+                refs_to_append = [k[4:] + ':' + r.strip() for r in ref_exts[k].split(';')]
+                for r in refs_to_append:
+                    if r not in ref_parts:
+                        ref_parts.append(r)
+            ref = ';'.join(ref_parts)
 
         # ignore local_ref if it's already part of the name
         if name and local_ref and name.endswith(local_ref):
