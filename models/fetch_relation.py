@@ -89,9 +89,17 @@ class FetchRelationBusStop:
 
     @classmethod
     def from_data(cls, data: dict) -> Self:
-        name: str = data['tags'].get('name', '').strip()
-        local_ref: str = data['tags'].get('local_ref', '').strip()
-        ref: str = data['tags'].get('ref', '').strip()
+        tags: dict[str, str] = data['tags']
+
+        name = tags.get('name', '').strip()
+        local_ref = tags.get('local_ref', '').strip()
+
+        ref_parts: dict[str, None] = {}
+        for k, v in sorted((k[4:], v) for k, v in tags.items() if k == 'ref' or k[:4] == 'ref:'):
+            for part in v.split(';'):
+                part = f'{k}{":" if k else ""}{part.strip()}'
+                ref_parts[part] = None
+        ref = ';'.join(ref_parts)
 
         # ignore local_ref if it's already part of the name
         if name and local_ref and name.endswith(local_ref):
@@ -108,11 +116,11 @@ class FetchRelationBusStop:
             type=data['type'],
             member=None,
             latLng=(data['lat'], data['lon']),
-            tags=data['tags'],
+            tags=tags,
             name=name,
             groupName=group_name,
-            highway=data['tags'].get('highway'),
-            public_transport=PublicTransport(data['tags']['public_transport']),
+            highway=tags.get('highway'),
+            public_transport=PublicTransport(tags['public_transport']),
         )
 
 
