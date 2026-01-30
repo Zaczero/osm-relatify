@@ -64,6 +64,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
+    debug=True,
     lifespan=lifespan,
     default_response_class=ORJSONResponse,
     openapi_url=None,
@@ -85,15 +86,13 @@ async def index(request: Request, user=Depends(fetch_user_details)):
 @app.post('/login')
 async def login(request: Request):
     state = os.urandom(32).hex()
-    authorization_url = 'https://www.openstreetmap.org/oauth2/authorize?' + urlencode(
-        {
-            'client_id': OSM_CLIENT,
-            'redirect_uri': str(request.url_for('callback')),
-            'response_type': 'code',
-            'scope': OSM_SCOPES,
-            'state': state,
-        }
-    )
+    authorization_url = 'https://www.openstreetmap.org/oauth2/authorize?' + urlencode({
+        'client_id': OSM_CLIENT,
+        'redirect_uri': str(request.url_for('callback')),
+        'response_type': 'code',
+        'scope': OSM_SCOPES,
+        'state': state,
+    })
     response = RedirectResponse(authorization_url, status.HTTP_303_SEE_OTHER)
     response.set_cookie('oauth_state', state, secure=not TEST_ENV, httponly=True)
     return response
