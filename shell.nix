@@ -4,7 +4,7 @@ let
   # Update packages with `nixpkgs-update` command
   pkgs =
     import
-      (fetchTarball "https://github.com/NixOS/nixpkgs/archive/e99366c665bdd53b7b500ccdc5226675cfc51f45.tar.gz")
+      (fetchTarball "https://github.com/NixOS/nixpkgs/archive/6308c3b21396534d8aaeac46179c14c439a89b8a.tar.gz")
       { };
 
   stdenv' = pkgs.gcc14Stdenv;
