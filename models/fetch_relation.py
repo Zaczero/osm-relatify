@@ -95,9 +95,9 @@ class FetchRelationBusStop:
         local_ref = tags.get('local_ref', '').strip()
 
         ref_parts: dict[str, None] = {}
-        for k, v in sorted((k[3:], v) for k, v in tags.items() if k == 'ref' or k[:4] == 'ref:'):
+        for k, v in sorted((k[4:], v) for k, v in tags.items() if k == 'ref' or k[:4] == 'ref:'):
             for part in v.split(';'):
-                part = f'{k}{part.strip()}'
+                part = f'{k}{":" if k else ""}{part.strip()}'
                 ref_parts[part] = None
         ref = ';'.join(ref_parts)
 
