@@ -17,6 +17,7 @@ const editBackBtn = document.querySelector("#view-edit .btn-back")
 const editReloadBtn = document.querySelector("#view-edit .btn-reload")
 const editTags = document.getElementById("edit-tags")
 const editWarnings = document.getElementById("edit-warnings")
+const editFixToSubmit = document.getElementById("fix-to-continue")
 const editSubmitBtn = document.querySelector("#view-edit .btn-next")
 const sumitBackBtn = document.querySelector("#view-submit .btn-back")
 const routeSummary = document.getElementById("route-summary")
@@ -130,6 +131,7 @@ export const processRouteWarnings = (data) => {
     if (activeView === "submit") switchView("edit")
 
     editSubmitBtn.classList.add("d-none")
+    editFixToSubmit.classList.add("d-none")
 
     editWarnings.innerHTML = ""
     let highestSeverityLevel = 0
@@ -201,7 +203,10 @@ export const processRouteWarnings = (data) => {
 
     editSubmitBtn.classList.toggle("mt-2", data.warnings.length > 0)
 
-    if (highestSeverityLevel === 0) editSubmitBtn.classList.remove("d-none")
+    if (highestSeverityLevel === 0) {
+        editSubmitBtn.classList.remove("d-none")
+        editFixToSubmit.classList.add("d-none")
+    }
 }
 
 const unload = () => {
