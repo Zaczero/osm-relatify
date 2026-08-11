@@ -1,5 +1,6 @@
 import { map } from "./map.js"
 
+map.setMaxZoom(21)
 let antPath = null
 
 export function clearAntPath() {
